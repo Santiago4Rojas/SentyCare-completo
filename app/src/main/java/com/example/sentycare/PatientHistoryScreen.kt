@@ -1,0 +1,342 @@
+package com.example.sentycare
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.sentycare.ui.theme.*
+import com.google.firebase.firestore.FirebaseFirestore
+import java.text.SimpleDateFormat
+import java.util.*
+
+data class Evaluacion(
+    val pacienteDocumento: String = "",
+    val pacienteNombre: String = "",
+    val escala: String = "",
+    val puntaje: Any? = "",
+    val clasificacion: String = "",
+    val fecha: Long = 0L
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PatientHistoryScreen(
+    patient: Patient,
+    onBackClick: () -> Unit = {}
+) {
+
+    val db = FirebaseFirestore.getInstance()
+
+    var evaluaciones by remember {
+        mutableStateOf<List<Evaluacion>>(emptyList())
+    }
+
+    var cargando by remember {
+        mutableStateOf(true)
+    }
+
+    LaunchedEffect(Unit) {
+
+        db.collection("evaluaciones")
+            .whereEqualTo(
+                "pacienteDocumento",
+                patient.noDoc
+            )
+            .get()
+            .addOnSuccessListener { result ->
+
+                val lista =
+                    result.documents.mapNotNull {
+                        it.toObject(
+                            Evaluacion::class.java
+                        )
+                    }
+                        .sortedByDescending {
+                            it.fecha
+                        }
+
+                evaluaciones = lista
+                cargando = false
+            }
+            .addOnFailureListener {
+                cargando = false
+            }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "Historial Clínico",
+                        color = Color.White,
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+                },
+
+                navigationIcon = {
+                    IconButton(
+                        onClick = onBackClick
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored
+                                .Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                    }
+                },
+
+                colors =
+                    TopAppBarDefaults
+                        .topAppBarColors(
+                            containerColor =
+                                DarkBlue
+                        )
+            )
+        }
+    ) { padding ->
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(Color.White)
+        ) {
+
+            // TARJETA PACIENTE
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor =
+                            Color(0xFFF5F8FC)
+                    ),
+
+                shape =
+                    RoundedCornerShape(12.dp)
+            ) {
+
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                ) {
+
+                    Text(
+                        "${patient.nombre} ${patient.apellido}",
+                        fontSize = 18.sp,
+                        fontWeight =
+                            FontWeight.Bold,
+                        color = DarkBlue
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(4.dp)
+                    )
+
+                    Text(
+                        "Documento: ${patient.noDoc}",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+
+                    Text(
+                        "Cama ${patient.numeroCama}",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+
+            when {
+
+                cargando -> {
+
+                    Box(
+                        modifier =
+                            Modifier.fillMaxSize(),
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                evaluaciones.isEmpty() -> {
+
+                    Box(
+                        modifier =
+                            Modifier.fillMaxSize(),
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+
+                        Column(
+                            horizontalAlignment =
+                                Alignment.CenterHorizontally
+                        ) {
+
+                            Icon(
+                                Icons.Outlined.Assessment,
+                                contentDescription = null,
+                                tint = LightGray,
+                                modifier =
+                                    Modifier.size(64.dp)
+                            )
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(12.dp)
+                            )
+
+                            Text(
+                                "Sin evaluaciones aún",
+                                color = DarkBlue,
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+
+                    LazyColumn(
+                        modifier =
+                            Modifier.fillMaxSize()
+                                .padding(
+                                    horizontal = 16.dp
+                                ),
+
+                        verticalArrangement =
+                            Arrangement.spacedBy(10.dp)
+                    ) {
+
+                        items(evaluaciones) { item ->
+
+                            EvaluationCard(item)
+                        }
+
+                        item {
+                            Spacer(
+                                modifier =
+                                    Modifier.height(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EvaluationCard(
+    item: Evaluacion
+) {
+
+    val fechaTexto =
+        remember(item.fecha) {
+            SimpleDateFormat(
+                "dd/MM/yyyy HH:mm",
+                Locale.getDefault()
+            ).format(Date(item.fecha))
+        }
+
+    val colorEscala = when {
+        item.escala.contains("Comfort") ->
+            Color(0xFF2196F3)
+
+        item.escala.contains("RASS") ->
+            Color(0xFF9C27B0)
+
+        item.escala.contains("Dolor") ->
+            Color(0xFFF44336)
+
+        else ->
+            DarkBlue
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = 3.dp
+            ),
+
+        colors =
+            CardDefaults.cardColors(
+                containerColor = Color.White
+            )
+    ) {
+
+        Column(
+            modifier =
+                Modifier.padding(16.dp)
+        ) {
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                horizontalArrangement =
+                    Arrangement.SpaceBetween,
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Text(
+                    item.escala,
+                    fontWeight =
+                        FontWeight.Bold,
+                    color = colorEscala,
+                    fontSize = 16.sp
+                )
+
+                Text(
+                    fechaTexto,
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+
+            Spacer(
+                modifier =
+                    Modifier.height(8.dp)
+            )
+
+            Text(
+                "Puntaje: ${item.puntaje}",
+                fontSize = 14.sp,
+                color = DarkBlue
+            )
+
+            Text(
+                item.clasificacion,
+                fontSize = 14.sp,
+                fontWeight =
+                    FontWeight.Medium,
+                color = Color.Gray
+            )
+        }
+    }
+}
