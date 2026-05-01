@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import com.example.sentycare.ui.theme.*
 
 // ─── Modelos de datos temporales (reemplazar con Firestore en v2) ─────────────
@@ -72,8 +73,9 @@ val sampleHistorial = listOf(
 fun HistorialScreen(
     onBackClick: () -> Unit = {}
 ) {
-    // En v2: reemplazar sampleHistorial por datos reales de Firestore
     val historial = sampleHistorial
+
+    BackHandler { onBackClick() }  // ← AQUÍ
 
     Scaffold(
         topBar = {

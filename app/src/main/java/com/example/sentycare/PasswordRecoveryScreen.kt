@@ -15,6 +15,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import com.example.sentycare.ui.theme.*
 import com.google.firebase.auth.FirebaseAuth
 
@@ -23,6 +28,8 @@ import com.google.firebase.auth.FirebaseAuth
 fun PasswordRecoveryScreen(
     onBackClick: () -> Unit
 ) {
+    BackHandler { onBackClick() }
+    val focusManager = LocalFocusManager.current
     var email by remember { mutableStateOf("") }
 
     val context = LocalContext.current
@@ -60,9 +67,14 @@ fun PasswordRecoveryScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(Color.White)
-                .padding(24.dp),
+                .padding(24.dp)
+                .pointerInput(Unit){
+                    detectTapGestures(onTap = { focusManager.clearFocus() })
+                },
+
 
             horizontalAlignment = Alignment.CenterHorizontally
+
         ) {
 
             Text(
@@ -77,7 +89,7 @@ fun PasswordRecoveryScreen(
                 label = "Correo de recuperación",
                 value = email,
                 onValueChange = { email = it },
-                placeholder = "ejemplo@correo.com"
+                placeholder = "Ingresa tu usuario"
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -112,16 +124,19 @@ fun PasswordRecoveryScreen(
 
                 shape = RoundedCornerShape(10.dp),
 
+                border = if (email.isNotEmpty()) null else BorderStroke(1.dp, LightGray),
+
                 colors = ButtonDefaults.buttonColors(
                     containerColor = DarkBlue,
-                    disabledContainerColor = LightGray
+                    disabledContainerColor = Color.White,
+                    contentColor = Color.White,
+                    disabledContentColor = LightGray
                 ),
 
                 enabled = email.isNotEmpty()
             ) {
                 Text(
                     text = "Enviar código",
-                    color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )

@@ -42,24 +42,8 @@ class MainActivity : ComponentActivity() {
                             currentScreen = "recovery"
                         },
 
-                        onNavigateToRegister = {
-                            currentScreen = "createUser"
-                        },
-
                         onLoginClick = {
                             currentScreen = "home"
-                        }
-                    )
-
-                    // CREAR USUARIO
-                    "createUser" -> CreateUserScreen(
-
-                        onBackClick = {
-                            currentScreen = "login"
-                        },
-
-                        onUserCreated = {
-                            currentScreen = "login"
                         }
                     )
 
@@ -73,13 +57,15 @@ class MainActivity : ComponentActivity() {
 
                     // HOME
                     "home" -> HomeScreen(
-
                         onRegisterClick = {
                             currentScreen = "register"
                         },
-
-                        onViewPatientsClick = {
-                            currentScreen = "patientsList"
+                        onPatientClick = { patient ->
+                            currentPatient = patient
+                            currentScreen = "evaluation"
+                        },
+                        onLogoutClick = {
+                            currentScreen = "login"
                         }
                     )
 
@@ -123,67 +109,33 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // LISTA PACIENTES
-                    "patientsList" -> PatientsListScreen(
-
-                        patients = patientsList,
-
-                        onBackClick = {
-                            currentScreen = "home"
-                        },
-
-                        onPatientClick = { patient ->
-
-                            currentPatient = patient
-                            currentScreen = "evaluation"
-                        }
-                    )
-
-                    // MENÚ EVALUACIONES
                     "evaluation" -> currentPatient?.let { patient ->
-
                         EvaluationScreen(
                             patient = patient,
-
-                            onChangePatient = {
-                                currentScreen = "patientsList"
+                            onHomeClick = { currentScreen = "home" },
+                            onComfortClick = { currentScreen = "comfortB" },
+                            onRassClick = { currentScreen = "Rass" },
+                            onDolorClick = { currentScreen = "Dolor" },
+                            onHistorialClick = { currentScreen = "patientHistory" },
+                            onInfoClick = { currentScreen = "info" },
+                            onPatientUpdated = { updatedPatient ->
+                                currentPatient = updatedPatient
                             },
-
-                            onHomeClick = {
+                            onPatientDischarged = {
+                                currentPatient = null
                                 currentScreen = "home"
-                            },
-
-                            onComfortClick = {
-                                currentScreen = "comfortB"
-                            },
-
-                            onRassClick = {
-                                currentScreen = "Rass"
-                            },
-
-                            onDolorClick = {
-                                currentScreen = "Dolor"
-                            },
-
-                            onHistorialClick = {
-                                currentScreen = "patientHistory"
-                            },
-
-                            onInfoClick = {
-                                currentScreen = "info"
                             }
                         )
                     }
 
                     // HISTORIAL PACIENTE
                     "patientHistory" -> currentPatient?.let { patient ->
-
                         PatientHistoryScreen(
                             patient = patient,
-
-                            onBackClick = {
-                                currentScreen = "evaluation"
-                            }
+                            onBackClick = { currentScreen = "evaluation" },
+                            onHomeClick = { currentScreen = "home" },
+                            onEvaluacionClick = { currentScreen = "evaluation" },
+                            onInfoClick = { currentScreen = "info" }
                         )
                     }
 
@@ -249,10 +201,10 @@ class MainActivity : ComponentActivity() {
 
                     // INFO
                     "info" -> InfoScreen(
-
-                        onBackClick = {
-                            currentScreen = "evaluation"
-                        }
+                        onBackClick = { currentScreen = "evaluation" },
+                        onHomeClick = { currentScreen = "home" },
+                        onEvaluacionClick = { currentScreen = "evaluation" },
+                        onHistorialClick = { currentScreen = "patientHistory" }
                     )
                 }
             }

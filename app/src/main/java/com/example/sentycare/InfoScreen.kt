@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import com.example.sentycare.ui.theme.*
 
 // ─── Modelo de datos ──────────────────────────────────────────────────────────
@@ -103,28 +104,27 @@ val ESCALAS_INFO = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InfoScreen(
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    onHomeClick: () -> Unit = {},
+    onEvaluacionClick: () -> Unit = {},
+    onHistorialClick: () -> Unit = {}
 ) {
+    BackHandler { onBackClick() }  // ← AQUÍ
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "Escalas Clínicas",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = Color.White
-                        )
-                    }
-                },
+                title = { Text("Info", color = Color.White, fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBlue)
+            )
+        },
+        bottomBar = {
+            SentyCareBottomBar(
+                currentTab = SentyCareTab.INFO,
+                onInicioClick = onHomeClick,
+                onEvaluacionClick = onEvaluacionClick,
+                onHistorialClick = onHistorialClick,
+                onInfoClick = {}
             )
         }
     ) { paddingValues ->

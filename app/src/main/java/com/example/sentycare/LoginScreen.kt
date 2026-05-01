@@ -1,4 +1,5 @@
 package com.example.sentycare.ui.screens
+import androidx.compose.foundation.BorderStroke
 
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -26,14 +27,21 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import com.example.sentycare.R
+import androidx.activity.compose.BackHandler
 import com.example.sentycare.ui.theme.*
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun LoginScreen(
     onNavigateToRecovery: () -> Unit,
-    onNavigateToRegister: () -> Unit,
     onLoginClick: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
@@ -42,11 +50,15 @@ fun LoginScreen(
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
 
+    BackHandler {}
+    val focusManager = LocalFocusManager.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .padding(horizontal = 32.dp),
+            .padding(horizontal = 32.dp)
+            .pointerInput(Unit){detectTapGestures(onTap = { focusManager.clearFocus() }) },
 
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -56,29 +68,29 @@ fun LoginScreen(
             painter = painterResource(id = R.drawable.logosentycare),
             contentDescription = "Logo SentyCare",
             modifier = Modifier
-                .size(240.dp)
+                .size(340.dp)
                 .clip(CircleShape),
 
             contentScale = ContentScale.Crop
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = "Acceso al Sistema",
+            text = "Monitoreo de pacientes en UCIP, de evaluación de comodidad, sedación y dolor del paciente.",
             color = DarkBlue,
-            fontSize = 20.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         SentyCareField(
             label = "Correo electrónico",
             value = email,
             onValueChange = { email = it },
-            placeholder = "ejemplo@correo.com",
+            placeholder = "Ingresa tu usuario",
             keyboardType = KeyboardType.Email
         )
 
@@ -88,11 +100,11 @@ fun LoginScreen(
             label = "Contraseña",
             value = password,
             onValueChange = { password = it },
-            placeholder = "Tu contraseña",
+            placeholder = "Ingresa tu contraseña",
             isPassword = true
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         Text(
             text = "¿Olvidaste tu contraseña?",
@@ -107,7 +119,7 @@ fun LoginScreen(
                 .padding(vertical = 8.dp)
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         Button(
             onClick = {
@@ -129,13 +141,17 @@ fun LoginScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp),
+                .height(58.dp),
 
             shape = RoundedCornerShape(8.dp),
 
+            border = if (email.isNotEmpty() && password.isNotEmpty()) null else BorderStroke(1.dp, LightGray),
+
             colors = ButtonDefaults.buttonColors(
                 containerColor = DarkBlue,
-                disabledContainerColor = LightGray
+                disabledContainerColor = Color.White,
+                contentColor = Color.White,
+                disabledContentColor = LightGray
             ),
 
             enabled = email.isNotEmpty() && password.isNotEmpty()
@@ -144,7 +160,6 @@ fun LoginScreen(
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.Login,
                 contentDescription = null,
-                tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
 
@@ -152,23 +167,10 @@ fun LoginScreen(
 
             Text(
                 text = "Iniciar Sesión",
-                color = Color.White,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.SemiBold
             )
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Text(
-            text = "¿No tienes cuenta? Regístrate",
-            color = MediumBlue,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.clickable {
-                onNavigateToRegister()
-            }
-        )
     }
 }
 
@@ -181,10 +183,9 @@ fun SentyCareField(
     isPassword: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    var passwordVisible by remember { mutableStateOf(false) }
 
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
             fontSize = 14.sp,
@@ -197,41 +198,39 @@ fun SentyCareField(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-
             modifier = Modifier.fillMaxWidth(),
-
             shape = RoundedCornerShape(8.dp),
-
-            textStyle = TextStyle(
-                color = Color.Black,
-                fontSize = 16.sp
-            ),
-
-            placeholder = {
-                Text(
-                    text = placeholder,
-                    color = LightGray,
-                    fontSize = 14.sp
-                )
-            },
-
-            visualTransformation =
-                if (isPassword)
-                    PasswordVisualTransformation()
-                else
-                    androidx.compose.ui.text.input.VisualTransformation.None,
-
+            textStyle = TextStyle(color = Color.Black, fontSize = 16.sp),
+            placeholder = { Text(text = placeholder, color = LightGray, fontSize = 14.sp) },
+            visualTransformation = if (isPassword && !passwordVisible)
+                PasswordVisualTransformation()
+            else
+                VisualTransformation.None,
             keyboardOptions = KeyboardOptions(
-                keyboardType = keyboardType
+                keyboardType = keyboardType,
+                autoCorrect = false,
+                imeAction = ImeAction.Done
             ),
-
+            trailingIcon = {
+                if (isPassword) {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible)
+                                Icons.Outlined.Visibility
+                            else
+                                Icons.Outlined.VisibilityOff,
+                            contentDescription = if (passwordVisible) "Ocultar" else "Mostrar",
+                            tint = LightGray
+                        )
+                    }
+                }
+            },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = DarkBlue,
                 unfocusedBorderColor = LightGray,
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White
             ),
-
             singleLine = true
         )
     }

@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import com.example.sentycare.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
@@ -34,7 +35,10 @@ data class Evaluacion(
 @Composable
 fun PatientHistoryScreen(
     patient: Patient,
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    onHomeClick: () -> Unit = {},
+    onEvaluacionClick: () -> Unit = {},
+    onInfoClick: () -> Unit = {}
 ) {
 
     val db = FirebaseFirestore.getInstance()
@@ -46,6 +50,8 @@ fun PatientHistoryScreen(
     var cargando by remember {
         mutableStateOf(true)
     }
+
+    BackHandler { onBackClick() }
 
     LaunchedEffect(Unit) {
 
@@ -78,34 +84,17 @@ fun PatientHistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "Historial Clínico",
-                        color = Color.White,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-                },
-
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBackClick
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored
-                                .Filled.ArrowBack,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                    }
-                },
-
-                colors =
-                    TopAppBarDefaults
-                        .topAppBarColors(
-                            containerColor =
-                                DarkBlue
-                        )
+                title = { Text("Historial", color = Color.White, fontWeight = FontWeight.Bold) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBlue)
+            )
+        },
+        bottomBar = {
+            SentyCareBottomBar(
+                currentTab = SentyCareTab.HISTORIAL,
+                onInicioClick = onHomeClick,
+                onEvaluacionClick = onEvaluacionClick,
+                onHistorialClick = {},
+                onInfoClick = onInfoClick
             )
         }
     ) { padding ->

@@ -1,6 +1,9 @@
 package com.example.sentycare
 
 data class Patient(
+    val id: String = "",
+    val activo: Boolean = true,
+
     val nombre: String = "",
     val apellido: String = "",
     val genero: String = "",
