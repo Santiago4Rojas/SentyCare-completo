@@ -43,13 +43,14 @@ fun ConsentScreen(
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
 
-    var acudienteNombre by remember { mutableStateOf("") }
-    var acudienteCedula by remember { mutableStateOf("") }
-    var acudienteTelefono by remember { mutableStateOf("") }
+    var acudienteNombre     by remember { mutableStateOf("") }
+    var acudienteCedula     by remember { mutableStateOf("") }
+    var acudienteTelefono   by remember { mutableStateOf("") }
     var acudienteParentesco by remember { mutableStateOf("") }
     val parentescos = listOf("Madre", "Padre", "Tutor", "Acudiente")
     var parentescoExpanded by remember { mutableStateOf(false) }
-    var consentAccepted by remember { mutableStateOf(false) }
+    var consentAccepted    by remember { mutableStateOf(false) }
+    var isSaving           by remember { mutableStateOf(false) }
 
     val canProceed =
         acudienteNombre.isNotBlank() &&
@@ -59,40 +60,64 @@ fun ConsentScreen(
                 consentAccepted
 
     fun openLink(url: String) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        context.startActivity(intent)
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
 
     fun saveConsent() {
-        val updatedPatient = hashMapOf(
+        isSaving = true
+
+        // 1️⃣ Actualizar el paciente: datos del acudiente + activo = true
+        val patientUpdate: Map<String, Any> = mapOf(
             "acudienteNombre"     to acudienteNombre,
             "acudienteCedula"     to acudienteCedula,
             "acudienteTelefono"   to acudienteTelefono,
-            "acudienteParentesco" to acudienteParentesco
+            "acudienteParentesco" to acudienteParentesco,
+            "activo"              to true   // ← clave: activa al paciente
         )
+
         db.collection("pacientes")
             .whereEqualTo("noDoc", patient.noDoc)
             .get()
             .addOnSuccessListener { result ->
-                result.documents.firstOrNull()?.reference?.update(updatedPatient as Map<String, Any>)
+                val docRef = result.documents.firstOrNull()?.reference
+                if (docRef == null) {
+                    isSaving = false
+                    Toast.makeText(context, "Paciente no encontrado en BD", Toast.LENGTH_SHORT).show()
+                    return@addOnSuccessListener
+                }
+
+                docRef.update(patientUpdate)
+                    .addOnSuccessListener {
+                        // 2️⃣ Guardar el registro de consentimiento
+                        val consent: Map<String, Any> = mapOf(
+                            "pacienteNombre"      to "${patient.nombre} ${patient.apellido}",
+                            "pacienteDocumento"   to patient.noDoc,
+                            "responsableNombre"   to acudienteNombre,
+                            "responsableCedula"   to acudienteCedula,
+                            "responsableTelefono" to acudienteTelefono,
+                            "parentesco"          to acudienteParentesco,
+                            "aceptado"            to true,
+                            "fecha"               to System.currentTimeMillis()
+                        )
+                        db.collection("consentimientos").add(consent)
+                            .addOnSuccessListener {
+                                isSaving = false
+                                Toast.makeText(context, "Consentimiento guardado", Toast.LENGTH_LONG).show()
+                                onConsentAccepted()
+                            }
+                            .addOnFailureListener { e ->
+                                isSaving = false
+                                Toast.makeText(context, "Error al guardar consentimiento: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                    }
+                    .addOnFailureListener { e ->
+                        isSaving = false
+                        Toast.makeText(context, "Error al activar paciente: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
             }
-        val consent = hashMapOf(
-            "pacienteNombre"      to "${patient.nombre} ${patient.apellido}",
-            "pacienteDocumento"   to patient.noDoc,
-            "responsableNombre"   to acudienteNombre,
-            "responsableCedula"   to acudienteCedula,
-            "responsableTelefono" to acudienteTelefono,
-            "parentesco"          to acudienteParentesco,
-            "aceptado"            to true,
-            "fecha"               to System.currentTimeMillis()
-        )
-        db.collection("consentimientos").add(consent)
-            .addOnSuccessListener {
-                Toast.makeText(context, "Consentimiento guardado", Toast.LENGTH_LONG).show()
-                onConsentAccepted()
-            }
-            .addOnFailureListener {
-                Toast.makeText(context, "Error al guardar", Toast.LENGTH_LONG).show()
+            .addOnFailureListener { e ->
+                isSaving = false
+                Toast.makeText(context, "Error al buscar paciente: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -116,18 +141,18 @@ fun ConsentScreen(
                 .background(Color(0xFFF0F4F8))
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp)
-                .pointerInput(Unit){ detectTapGestures(onTap = { focusManager.clearFocus() }) }
+                .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
         ) {
             // ── Card principal ────────────────────────────────────────────
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                modifier  = Modifier.fillMaxWidth(),
+                shape     = RoundedCornerShape(16.dp),
+                colors    = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(3.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
 
-                    // Paciente
+                    // Resumen del paciente
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -135,107 +160,123 @@ fun ConsentScreen(
                             .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Outlined.Person, contentDescription = null, tint = DarkBlue, modifier = Modifier.size(26.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Icon(
+                            Icons.Outlined.Person,
+                            contentDescription = null,
+                            tint     = DarkBlue,
+                            modifier = Modifier.size(26.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
                         Column {
-                            Text("${patient.nombre} ${patient.apellido}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkBlue)
-                            Text("Cama ${patient.numeroCama} · ${patient.diagnostico}", fontSize = 13.sp, color = Color.Gray)
+                            Text(
+                                "${patient.nombre} ${patient.apellido}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize   = 15.sp,
+                                color      = DarkBlue
+                            )
+                            Text(
+                                "Cama ${patient.numeroCama} · ${patient.diagnostico}",
+                                fontSize = 13.sp,
+                                color    = Color.Gray
+                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(Modifier.height(20.dp))
                     HorizontalDivider(color = Color(0xFFEEEEEE))
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(Modifier.height(20.dp))
 
                     // Declaración
                     Text("Declaración", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DarkBlue)
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(Modifier.height(10.dp))
                     Text(
-                        text = "Declaro que he recibido información suficiente sobre las evaluaciones clínicas de sedación y dolor que se realizarán al paciente, comprendo su propósito asistencial y autorizo su aplicación por parte del personal de enfermería de la UCI Pediátrica.",
-                        fontSize = 14.sp,
-                        color = Color.DarkGray,
-                        lineHeight = 22.sp
+                        "Declaro que he recibido información suficiente sobre las evaluaciones clínicas de " +
+                                "sedación y dolor que se realizarán al paciente, comprendo su propósito asistencial " +
+                                "y autorizo su aplicación por parte del personal de enfermería de la UCI Pediátrica.",
+                        fontSize    = 14.sp,
+                        color       = Color.DarkGray,
+                        lineHeight  = 22.sp
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(Modifier.height(24.dp))
                     HorizontalDivider(color = Color(0xFFEEEEEE))
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(Modifier.height(20.dp))
 
                     // Datos del acudiente
                     Text("Datos del Acudiente", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DarkBlue)
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(Modifier.height(16.dp))
 
-                    // Nombre
+                    // Nombre completo
                     Text("Nombre completo *", fontSize = 13.sp, color = DarkBlue, fontWeight = FontWeight.Medium)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(Modifier.height(6.dp))
                     OutlinedTextField(
-                        value = acudienteNombre,
+                        value         = acudienteNombre,
                         onValueChange = { acudienteNombre = it },
-                        placeholder = { Text("Ej: María Pérez", color = LightGray) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DarkBlue,
+                        placeholder   = { Text("Ej: María Pérez", color = LightGray) },
+                        modifier      = Modifier.fillMaxWidth(),
+                        shape         = RoundedCornerShape(8.dp),
+                        singleLine    = true,
+                        colors        = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor   = DarkBlue,
                             unfocusedBorderColor = LightGray
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(Modifier.height(14.dp))
 
-                    // Cédula — entre 6 y 10
+                    // Cédula
                     LimitedFormField(
-                        label = "Cédula *",
-                        value = acudienteCedula,
-                        onChange = { acudienteCedula = it },
-                        placeholder = "Entre 6 y 10 dígitos",
+                        label        = "Cédula *",
+                        value        = acudienteCedula,
+                        onChange     = { acudienteCedula = it },
+                        placeholder  = "Entre 6 y 10 dígitos",
                         keyboardType = KeyboardType.Number,
-                        maxLength = 10,
-                        minLength = 6
+                        maxLength    = 10,
+                        minLength    = 6
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(Modifier.height(14.dp))
 
-                    // Teléfono — exactamente 10
+                    // Teléfono
                     LimitedFormField(
-                        label = "Teléfono *",
-                        value = acudienteTelefono,
-                        onChange = { acudienteTelefono = it },
-                        placeholder = "10 dígitos",
+                        label        = "Teléfono *",
+                        value        = acudienteTelefono,
+                        onChange     = { acudienteTelefono = it },
+                        placeholder  = "10 dígitos",
                         keyboardType = KeyboardType.Phone,
-                        maxLength = 10,
-                        minLength = 10
+                        maxLength    = 10,
+                        minLength    = 10
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(Modifier.height(14.dp))
 
                     // Parentesco
                     Text("Parentesco *", fontSize = 13.sp, color = DarkBlue, fontWeight = FontWeight.Medium)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(Modifier.height(6.dp))
                     ExposedDropdownMenuBox(
-                        expanded = parentescoExpanded,
+                        expanded        = parentescoExpanded,
                         onExpandedChange = { parentescoExpanded = !parentescoExpanded }
                     ) {
                         OutlinedTextField(
-                            value = acudienteParentesco,
+                            value         = acudienteParentesco,
                             onValueChange = {},
-                            readOnly = true,
-                            modifier = Modifier.menuAnchor().fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp),
-                            placeholder = { Text("Seleccione", color = LightGray) },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = parentescoExpanded) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = DarkBlue,
+                            readOnly      = true,
+                            modifier      = Modifier.menuAnchor().fillMaxWidth(),
+                            shape         = RoundedCornerShape(8.dp),
+                            placeholder   = { Text("Seleccione", color = LightGray) },
+                            trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = parentescoExpanded) },
+                            colors        = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor   = DarkBlue,
                                 unfocusedBorderColor = LightGray
                             )
                         )
                         ExposedDropdownMenu(
-                            expanded = parentescoExpanded,
+                            expanded         = parentescoExpanded,
                             onDismissRequest = { parentescoExpanded = false }
                         ) {
                             parentescos.forEach { item ->
                                 DropdownMenuItem(
-                                    text = { Text(item) },
+                                    text    = { Text(item) },
                                     onClick = { acudienteParentesco = item; parentescoExpanded = false }
                                 )
                             }
@@ -244,13 +285,13 @@ fun ConsentScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
             // ── Checkbox + Leyes ──────────────────────────────────────────
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
+                modifier  = Modifier.fillMaxWidth(),
+                shape     = RoundedCornerShape(12.dp),
+                colors    = CardDefaults.cardColors(
                     containerColor = if (consentAccepted) Color(0xFFE8F5E9) else Color.White
                 ),
                 elevation = CardDefaults.cardElevation(2.dp)
@@ -263,18 +304,18 @@ fun ConsentScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(
-                            checked = consentAccepted,
+                            checked         = consentAccepted,
                             onCheckedChange = { consentAccepted = it },
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = DarkBlue,
+                            colors          = CheckboxDefaults.colors(
+                                checkedColor   = DarkBlue,
                                 uncheckedColor = LightGray
                             )
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "Acepto el consentimiento informado y autorizo las evaluaciones clínicas del paciente.",
-                            fontSize = 14.sp,
-                            color = if (consentAccepted) DarkBlue else Color.DarkGray,
+                            text       = "Acepto el consentimiento informado y autorizo las evaluaciones clínicas del paciente.",
+                            fontSize   = 14.sp,
+                            color      = if (consentAccepted) DarkBlue else Color.DarkGray,
                             fontWeight = if (consentAccepted) FontWeight.Medium else FontWeight.Normal,
                             lineHeight = 20.sp
                         )
@@ -284,26 +325,26 @@ fun ConsentScreen(
 
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text("Leyes", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkBlue)
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(Modifier.height(6.dp))
                         TextButton(
-                            onClick = { openLink("https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=49981") },
+                            onClick        = { openLink("https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=49981") },
                             contentPadding = PaddingValues(0.dp)
                         ) {
                             Text(
                                 "🔗 Ley 1581 de 2012 - Protección de Datos Personales",
-                                color = MediumBlue,
-                                fontSize = 13.sp,
+                                color          = MediumBlue,
+                                fontSize       = 13.sp,
                                 textDecoration = TextDecoration.Underline
                             )
                         }
                         TextButton(
-                            onClick = { openLink("https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=34492") },
+                            onClick        = { openLink("https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=34492") },
                             contentPadding = PaddingValues(0.dp)
                         ) {
                             Text(
                                 "🔗 Ley 1273 de 2009 - Delitos Informáticos",
-                                color = MediumBlue,
-                                fontSize = 13.sp,
+                                color          = MediumBlue,
+                                fontSize       = 13.sp,
                                 textDecoration = TextDecoration.Underline
                             )
                         }
@@ -311,25 +352,29 @@ fun ConsentScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
             Button(
-                onClick = { saveConsent() },
-                enabled = canProceed,
+                onClick  = { saveConsent() },
+                enabled  = canProceed && !isSaving,
                 modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(10.dp),
-                border = if (canProceed) null else BorderStroke(1.dp, LightGray),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = DarkBlue,
-                    contentColor = Color.White,
+                shape    = RoundedCornerShape(10.dp),
+                border   = if (canProceed && !isSaving) null else BorderStroke(1.dp, LightGray),
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor         = DarkBlue,
+                    contentColor           = Color.White,
                     disabledContainerColor = Color.White,
-                    disabledContentColor = LightGray
+                    disabledContentColor   = LightGray
                 )
             ) {
-                Text("Confirmar Consentimiento", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                if (isSaving) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                } else {
+                    Text("Confirmar Consentimiento", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(Modifier.height(20.dp))
         }
     }
 }

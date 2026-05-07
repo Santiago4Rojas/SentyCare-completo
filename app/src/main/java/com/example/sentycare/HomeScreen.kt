@@ -32,6 +32,8 @@ import androidx.compose.ui.platform.LocalContext
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
@@ -63,141 +65,210 @@ fun HomeScreen(
         }
     }
 
-    // Dialog modificar cama
     patientToEditCama?.let { patient ->
+        var camaOcupadaError by remember { mutableStateOf("") }
+        var isCheckingCama    by remember { mutableStateOf(false) }
+
         AlertDialog(
-            onDismissRequest = { patientToEditCama = null; newCamaValue = "" },
-            title = { Text("Modificar Cama", fontWeight = FontWeight.Bold, color = DarkBlue) },
+            onDismissRequest = { patientToEditCama = null; newCamaValue = ""; camaOcupadaError = "" },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(16.dp),
+            title = null,
             text = {
-                Column {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        "Ingrese el nuevo número de cama para ${patient.nombre} ${patient.apellido}",
-                        color = Color.Gray, fontSize = 14.sp
+                        "Modificar cama",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Nueva cama para ${patient.nombre} ${patient.apellido}",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(16.dp))
                     OutlinedTextField(
-                        value = newCamaValue,
-                        onValueChange = { if (it.length <= 2) newCamaValue = it },
-                        label = { Text("Número de cama") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(8.dp)
+                        value         = newCamaValue,
+                        onValueChange = { if (it.length <= 2) { newCamaValue = it; camaOcupadaError = "" } },
+                        label         = { Text("Número de cama") },
+                        singleLine    = true,
+                        isError       = camaOcupadaError.isNotEmpty(),
+                        supportingText = {
+                            if (camaOcupadaError.isNotEmpty())
+                                Text(camaOcupadaError, color = MaterialTheme.colorScheme.error)
+                        },
+                        shape  = RoundedCornerShape(8.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick  = { patientToEditCama = null; newCamaValue = ""; camaOcupadaError = "" },
+                            modifier = Modifier.weight(1f),
+                            shape    = RoundedCornerShape(8.dp)
+                        ) { Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+
+                        Button(
+                            onClick = {
+                                if (newCamaValue.isNotEmpty() && newCamaValue != patient.numeroCama) {
+                                    isCheckingCama = true
+                                    db.collection("pacientes")
+                                        .whereEqualTo("numeroCama", newCamaValue)
+                                        .whereEqualTo("activo", true)
+                                        .get()
+                                        .addOnSuccessListener { result ->
+                                            val ocupante = result.documents.firstOrNull {
+                                                it.getString("noDoc") != patient.noDoc
+                                            }
+                                            if (ocupante != null) {
+                                                val nombre = "${ocupante.getString("nombre") ?: ""} ${ocupante.getString("apellido") ?: ""}".trim()
+                                                camaOcupadaError = "Ocupada por ${nombre.ifBlank { "otro paciente" }}"
+                                                isCheckingCama = false
+                                            } else {
+                                                patients = patients.map {
+                                                    if (it.id == patient.id) it.copy(numeroCama = newCamaValue) else it
+                                                }
+                                                db.collection("pacientes")
+                                                    .document(patient.id)
+                                                    .update("numeroCama", newCamaValue)
+                                                isCheckingCama    = false
+                                                patientToEditCama = null
+                                                newCamaValue      = ""
+                                                camaOcupadaError  = ""
+                                            }
+                                        }
+                                        .addOnFailureListener {
+                                            camaOcupadaError = "Error al verificar la cama"
+                                            isCheckingCama   = false
+                                        }
+                                } else if (newCamaValue == patient.numeroCama) {
+                                    // misma cama → cerrar sin cambios
+                                    patientToEditCama = null
+                                    newCamaValue      = ""
+                                }
+                            },
+                            enabled  = newCamaValue.isNotEmpty() && !isCheckingCama,
+                            modifier = Modifier.weight(1f),
+                            shape    = RoundedCornerShape(8.dp),
+                            colors   = ButtonDefaults.buttonColors(containerColor = DarkBlue)
+                        ) {
+                            if (isCheckingCama) {
+                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                            } else {
+                                Text("Guardar", color = Color.White, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
                 }
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newCamaValue.isNotEmpty()) {
-                            val camaFinal = newCamaValue
-                            val patientId = patient.id
-                            patients = patients.map {
-                                if (it.id == patientId) it.copy(numeroCama = camaFinal) else it
-                            }
-                            focusManager.clearFocus()
-                            patientToEditCama = null
-                            newCamaValue = ""
-                            db.collection("pacientes").document(patientId).update("numeroCama", camaFinal)
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkBlue),
-                    shape = RoundedCornerShape(8.dp)
-                ) { Text("Guardar", color = Color.White) }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = { patientToEditCama = null; newCamaValue = "" },
-                    shape = RoundedCornerShape(8.dp)
-                ) { Text("Cancelar", color = DarkBlue) }
-            },
-            shape = RoundedCornerShape(12.dp)
+            confirmButton = {}
         )
     }
+    Box(modifier = Modifier.fillMaxSize()) {
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+        Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
 
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(DarkBlue)
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.logosentycare),
-                contentDescription = "Logo SentyCare",
-                modifier = Modifier.size(48.dp).clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Bienvenido", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
-                Text(text = doctorName, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(
-                    onClick = onRegisterClick,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                ) {
-                    Icon(imageVector = Icons.Outlined.PersonAdd, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "Registrar", color = Color.White, fontSize = 16.sp)
-                }
-                Box(
-                    modifier = Modifier.size(32.dp).clickable { openPdfFromAssets(context, "ManualSentyCare.pdf") },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(imageVector = Icons.Outlined.QuestionMark, contentDescription = "Manual", tint = Color.White, modifier = Modifier.size(18.dp))
-                }
-                Box(
-                    modifier = Modifier.size(32.dp).clickable { onLogoutClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(imageVector = Icons.Outlined.Logout, contentDescription = "Cerrar sesión", tint = Color.White, modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-
-        // LISTA DE PACIENTES
-        if (patients.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = "Actualmente no hay registro de\npacientes hospitalizados en esta área",
-                    fontSize = 15.sp,
-                    color = LightGray,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(DarkBlue)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(patients, key = { it.id }) { patient ->
-                    val isExpanded = expandedPatientId == patient.id
-                    ExpandablePatientCard(
-                        patient = patient,
-                        isExpanded = isExpanded,
-                        onCardClick = { expandedPatientId = if (isExpanded) null else patient.id },
-                        onGoToPatient = { onPatientClick(patient) },
-                        onEditCama = { newCamaValue = patient.numeroCama; patientToEditCama = patient },
-                        onDischarge = {
-                            db.collection("pacientes").document(patient.id)
-                                .update("activo", false)
-                                .addOnSuccessListener {
-                                    patients = patients.filter { it.id != patient.id }
-                                    if (expandedPatientId == patient.id) expandedPatientId = null
-                                }
-                        }
+                Image(
+                    painter = painterResource(id = R.drawable.logosentycare),
+                    contentDescription = "Logo SentyCare",
+                    modifier = Modifier.size(48.dp).clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Bienvenido", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Text(text = doctorName, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(32.dp).clickable { openPdfFromAssets(context, "ManualSentyCare.pdf") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(imageVector = Icons.Outlined.QuestionMark, contentDescription = "Manual", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    Box(
+                        modifier = Modifier.size(32.dp).clickable { onLogoutClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(imageVector = Icons.Outlined.Logout, contentDescription = "Cerrar sesión", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+
+            if (patients.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "Actualmente no hay registro de\npacientes hospitalizados en esta área",
+                        fontSize = 15.sp,
+                        color = LightGray,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
                     )
                 }
-                item { Spacer(modifier = Modifier.height(8.dp)) }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 16.dp, bottom = 88.dp)
+                ) {
+                    items(patients, key = { it.id }) { patient ->
+                        val isExpanded = expandedPatientId == patient.id
+                        ExpandablePatientCard(
+                            patient = patient,
+                            isExpanded = isExpanded,
+                            onCardClick = { expandedPatientId = if (isExpanded) null else patient.id },
+                            onGoToPatient = { onPatientClick(patient) },
+                            onEditCama = { newCamaValue = patient.numeroCama; patientToEditCama = patient },
+                            onDischarge = {
+                                db.collection("pacientes").document(patient.id)
+                                    .update(mapOf("activo" to false, "numeroCama" to "", "diagnostico" to ""))
+                                    .addOnSuccessListener {
+                                        patients = patients.filter { it.id != patient.id }
+                                        if (expandedPatientId == patient.id) expandedPatientId = null
+                                    }
+                            }
+                        )
+                    }
+                }
             }
         }
+
+        ExtendedFloatingActionButton(
+            onClick = onRegisterClick,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 20.dp),
+            containerColor = DarkBlue,
+            contentColor = Color.White,
+            shape = RoundedCornerShape(14.dp),
+            icon = {
+                Icon(imageVector = Icons.Outlined.PersonAdd, contentDescription = null)
+            },
+            text = {
+                Text("Registrar paciente", fontWeight = FontWeight.SemiBold)
+            }
+        )
     }
 }
+
+// ─────────────────────────────────────────────────────────────
+// Funciones de nivel de archivo — deben estar en el mismo .kt
+// ─────────────────────────────────────────────────────────────
 
 fun openPdfFromAssets(context: Context, assetFileName: String) {
     try {

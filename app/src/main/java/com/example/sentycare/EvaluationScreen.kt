@@ -21,6 +21,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.input.KeyboardType
 import com.example.sentycare.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -46,75 +53,188 @@ fun EvaluationScreen(
     var showAltaDialog by remember { mutableStateOf(false) }
 
     if (showCamaDialog) {
+        var camaOcupadaError by remember { mutableStateOf("") }
+        var isCheckingCama   by remember { mutableStateOf(false) }
+
         AlertDialog(
-            onDismissRequest = { showCamaDialog = false; newCamaValue = "" },
-            title = { Text("Modificar Cama", fontWeight = FontWeight.Bold, color = DarkBlue) },
+            onDismissRequest = { showCamaDialog = false; newCamaValue = ""; camaOcupadaError = "" },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(16.dp),
+            title = null,
             text = {
-                Column {
-                    Text("Nuevo número de cama para ${currentPatient.nombre}", color = Color.Gray, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = newCamaValue,
-                        onValueChange = { if (it.length <= 2) newCamaValue = it },
-                        label = { Text("Número de cama") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(8.dp)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Modificar cama",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newCamaValue.isNotEmpty()) {
-                            val camaFinal = newCamaValue
-                            val patientId = currentPatient.id
-                            currentPatient = currentPatient.copy(numeroCama = camaFinal)
-                            onPatientUpdated(currentPatient)
-                            showCamaDialog = false
-                            newCamaValue = ""
-                            db.collection("pacientes").document(patientId).update("numeroCama", camaFinal)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Nueva cama para ${currentPatient.nombre}",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value         = newCamaValue,
+                        onValueChange = { if (it.length <= 2) { newCamaValue = it; camaOcupadaError = "" } },
+                        label         = { Text("Número de cama") },
+                        singleLine    = true,
+                        isError       = camaOcupadaError.isNotEmpty(),
+                        supportingText = {
+                            if (camaOcupadaError.isNotEmpty())
+                                Text(camaOcupadaError, color = MaterialTheme.colorScheme.error)
+                        },
+                        shape           = RoundedCornerShape(8.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier        = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick  = { showCamaDialog = false; newCamaValue = ""; camaOcupadaError = "" },
+                            modifier = Modifier.weight(1f),
+                            shape    = RoundedCornerShape(8.dp)
+                        ) { Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+
+                        Button(
+                            onClick = {
+                                if (newCamaValue.isNotEmpty() && newCamaValue != currentPatient.numeroCama) {
+                                    isCheckingCama = true
+                                    db.collection("pacientes")
+                                        .whereEqualTo("numeroCama", newCamaValue)
+                                        .whereEqualTo("activo", true)
+                                        .get()
+                                        .addOnSuccessListener { result ->
+                                            val ocupante = result.documents.firstOrNull {
+                                                it.getString("noDoc") != currentPatient.noDoc
+                                            }
+                                            if (ocupante != null) {
+                                                val nombre = "${ocupante.getString("nombre") ?: ""} ${ocupante.getString("apellido") ?: ""}".trim()
+                                                camaOcupadaError = "Ocupada por ${nombre.ifBlank { "otro paciente" }}"
+                                                isCheckingCama   = false
+                                            } else {
+                                                val camaFinal = newCamaValue
+                                                currentPatient = currentPatient.copy(numeroCama = camaFinal)
+                                                onPatientUpdated(currentPatient)
+                                                db.collection("pacientes")
+                                                    .document(currentPatient.id)
+                                                    .update("numeroCama", camaFinal)
+                                                isCheckingCama   = false
+                                                showCamaDialog   = false
+                                                newCamaValue     = ""
+                                                camaOcupadaError = ""
+                                            }
+                                        }
+                                        .addOnFailureListener {
+                                            camaOcupadaError = "Error al verificar la cama"
+                                            isCheckingCama   = false
+                                        }
+                                } else if (newCamaValue == currentPatient.numeroCama) {
+                                    showCamaDialog = false
+                                    newCamaValue   = ""
+                                }
+                            },
+                            enabled  = newCamaValue.isNotEmpty() && !isCheckingCama,
+                            modifier = Modifier.weight(1f),
+                            shape    = RoundedCornerShape(8.dp),
+                            colors   = ButtonDefaults.buttonColors(containerColor = DarkBlue)
+                        ) {
+                            if (isCheckingCama) {
+                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                            } else {
+                                Text("Guardar", color = Color.White, fontWeight = FontWeight.Medium)
+                            }
                         }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkBlue),
-                    shape = RoundedCornerShape(8.dp)
-                ) { Text("Guardar", color = Color.White) }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showCamaDialog = false; newCamaValue = "" }, shape = RoundedCornerShape(8.dp)) {
-                    Text("Cancelar", color = DarkBlue)
+                    }
                 }
             },
-            shape = RoundedCornerShape(12.dp)
+            confirmButton = {}
         )
     }
 
     if (showAltaDialog) {
         AlertDialog(
             onDismissRequest = { showAltaDialog = false },
-            title = { Text("Dar de Alta", fontWeight = FontWeight.Bold, color = Color(0xFFE53935)) },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(16.dp),
+            title = null,
             text = {
-                Text(
-                    "¿Confirma dar de alta a ${currentPatient.nombre} ${currentPatient.apellido}? Esta acción lo retirará de la lista de pacientes activos.",
-                    fontSize = 14.sp, color = Color.Gray
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        db.collection("pacientes").document(currentPatient.id)
-                            .update("activo", false)
-                            .addOnSuccessListener { showAltaDialog = false; onPatientDischarged() }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
-                    shape = RoundedCornerShape(8.dp)
-                ) { Text("Dar de Alta", color = Color.White) }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showAltaDialog = false }, shape = RoundedCornerShape(8.dp)) {
-                    Text("Cancelar", color = DarkBlue)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFCEBEB)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.ExitToApp,
+                            contentDescription = null,
+                            tint = Color(0xFFA32D2D),
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Dar de alta",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )) {
+                                append("${currentPatient.nombre} ${currentPatient.apellido}")
+                            }
+                            append(" será retirado de la lista de pacientes activos.")
+                        },
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 22.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Esta acción no se puede deshacer.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 20.sp
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showAltaDialog = false },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) { Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        Button(
+                            onClick = {
+                                db.collection("pacientes").document(currentPatient.id)
+                                    .update(mapOf("activo" to false, "numeroCama" to "", "diagnostico" to ""))
+                                    .addOnSuccessListener { showAltaDialog = false; onPatientDischarged() }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFA32D2D),
+                                contentColor   = Color(0xFFF7C1C1)
+                            )
+                        ) { Text("Dar de alta", fontWeight = FontWeight.Medium) }
+                    }
                 }
             },
-            shape = RoundedCornerShape(12.dp)
+            confirmButton = {}
         )
     }
 

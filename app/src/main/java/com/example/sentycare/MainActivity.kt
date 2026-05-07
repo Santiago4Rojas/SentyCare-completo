@@ -32,17 +32,15 @@ class MainActivity : ComponentActivity() {
                         PatientRepository.patients.toList()
                     )
                 }
+                var doctorName by remember { mutableStateOf("Doctor") }
 
                 when (currentScreen) {
 
                     // LOGIN
                     "login" -> LoginScreen(
-
-                        onNavigateToRecovery = {
-                            currentScreen = "recovery"
-                        },
-
-                        onLoginClick = {
+                        onNavigateToRecovery = { currentScreen = "recovery" },
+                        onLoginClick = { nombre ->
+                            doctorName = nombre          // guarda el nombre en un var
                             currentScreen = "home"
                         }
                     )
@@ -57,6 +55,7 @@ class MainActivity : ComponentActivity() {
 
                     // HOME
                     "home" -> HomeScreen(
+                        doctorName = doctorName,
                         onRegisterClick = {
                             currentScreen = "register"
                         },

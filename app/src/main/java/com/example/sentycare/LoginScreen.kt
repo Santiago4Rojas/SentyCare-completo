@@ -38,17 +38,19 @@ import com.example.sentycare.R
 import androidx.activity.compose.BackHandler
 import com.example.sentycare.ui.theme.*
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun LoginScreen(
     onNavigateToRecovery: () -> Unit,
-    onLoginClick: () -> Unit
+    onLoginClick: (String) -> Unit = {}
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
+    val db = FirebaseFirestore.getInstance()
 
     BackHandler {}
     val focusManager = LocalFocusManager.current
@@ -126,9 +128,18 @@ fun LoginScreen(
 
                 auth.signInWithEmailAndPassword(email, password)
                     .addOnCompleteListener { task ->
-
                         if (task.isSuccessful) {
-                            onLoginClick()
+                            val uid = auth.currentUser?.uid ?: ""
+                            db.collection("usuarios")
+                                .document(uid)
+                                .get()
+                                .addOnSuccessListener { doc ->
+                                    val nombre = doc.getString("nombre") ?: "Doctor"
+                                    onLoginClick(nombre)
+                                }
+                                .addOnFailureListener {
+                                    onLoginClick("Doctor")
+                                }
                         } else {
                             Toast.makeText(
                                 context,

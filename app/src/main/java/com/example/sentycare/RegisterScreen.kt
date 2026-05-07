@@ -2,9 +2,15 @@ package com.example.sentycare
 
 import android.app.DatePickerDialog
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.outlined.PersonOff
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -15,49 +21,65 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.Bed
+import androidx.compose.ui.draw.clip
 import com.example.sentycare.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import java.util.Calendar
+
+private enum class LookupState { IDLE, LOADING, ACTIVE, INACTIVE, NOT_FOUND }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterScreen(
     onBackClick: () -> Unit = {},
     onCancelClick: () -> Unit = {},
-    onRegisterClick: (Patient) -> Unit = {}
+    onRegisterClick: (Patient) -> Unit = {}   // mismo nombre que en MainActivity
 ) {
     BackHandler { onBackClick() }
     val focusManager = LocalFocusManager.current
-    var nombre by remember { mutableStateOf("") }
-    var apellido by remember { mutableStateOf("") }
-    var genero by remember { mutableStateOf("") }
-    val generos = listOf("Masculino", "Femenino")
-    var generoExpanded by remember { mutableStateOf(false) }
-    var noDoc by remember { mutableStateOf("") }
+    val context      = LocalContext.current
+    val db           = FirebaseFirestore.getInstance()
+
+    var noDoc           by remember { mutableStateOf("") }
+    var nombre          by remember { mutableStateOf("") }
+    var apellido        by remember { mutableStateOf("") }
+    var genero          by remember { mutableStateOf("") }
     var fechaNacimiento by remember { mutableStateOf("") }
-    var rh by remember { mutableStateOf("") }
-    val tiposDeSangre = listOf("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
-    var rhExpanded by remember { mutableStateOf(false) }
-    var numeroCama by remember { mutableStateOf("") }
-    var diagnostico by remember { mutableStateOf("") }
+    var rh              by remember { mutableStateOf("") }
+    var numeroCama      by remember { mutableStateOf("") }
+    var diagnostico     by remember { mutableStateOf("") }
 
-    val context = LocalContext.current
-    val db = FirebaseFirestore.getInstance()
+    val generos        = listOf("Masculino", "Femenino")
+    val tiposDeSangre  = listOf("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
+    var generoExpanded by remember { mutableStateOf(false) }
+    var rhExpanded     by remember { mutableStateOf(false) }
+
+    var lookupState  by remember { mutableStateOf(LookupState.IDLE) }
+    var foundPatient by remember { mutableStateOf<Patient?>(null) }
+
+    var showActiveDialog by remember { mutableStateOf(false) }
+    var showCamaDialog   by remember { mutableStateOf(false) }
+    var camaOcupadaPor   by remember { mutableStateOf("") }
+    var isRegistering    by remember { mutableStateOf(false) }
+
+    // Solo campos de identidad son readonly en INACTIVE
+    val isReadOnly = lookupState == LookupState.INACTIVE
+
     val calendar = Calendar.getInstance()
-
     val datePickerDialog = DatePickerDialog(
         context,
         { _, year, month, day ->
@@ -68,23 +90,189 @@ fun RegisterScreen(
         calendar.get(Calendar.DAY_OF_MONTH)
     )
 
-    val formValid =
-        nombre.isNotBlank() &&
-                apellido.isNotBlank() &&
-                genero.isNotBlank() &&
-                noDoc.length == 10 &&
-                fechaNacimiento.isNotBlank() &&
-                rh.isNotBlank() &&
-                numeroCama.isNotBlank() &&
-                numeroCama.length <= 2 &&
-                diagnostico.isNotBlank()
+    fun resetForm() {
+        lookupState  = LookupState.IDLE
+        foundPatient = null
+        nombre = ""; apellido = ""; genero = ""; fechaNacimiento = ""
+        rh = ""; numeroCama = ""; diagnostico = ""
+    }
+
+    fun lookupPatient(doc: String) {
+        if (doc.length != 10) { resetForm(); return }
+        lookupState = LookupState.LOADING
+        db.collection("pacientes")
+            .whereEqualTo("noDoc", doc)
+            .get()
+            .addOnSuccessListener { result ->
+                val snap = result.documents.firstOrNull()
+                if (snap == null) {
+                    lookupState  = LookupState.NOT_FOUND
+                    foundPatient = null
+                } else {
+                    val activo  = snap.getBoolean("activo") ?: true
+                    val patient = Patient(
+                        nombre          = snap.getString("nombre")          ?: "",
+                        apellido        = snap.getString("apellido")        ?: "",
+                        genero          = snap.getString("genero")          ?: "",
+                        noDoc           = snap.getString("noDoc")           ?: doc,
+                        fechaNacimiento = snap.getString("fechaNacimiento") ?: "",
+                        rh              = snap.getString("rh")              ?: "",
+                        numeroCama      = snap.getString("numeroCama")      ?: "",
+                        diagnostico     = snap.getString("diagnostico")     ?: ""
+                    )
+                    if (activo) {
+                        foundPatient     = patient
+                        lookupState      = LookupState.ACTIVE
+                        showActiveDialog = true
+                    } else {
+                        foundPatient = patient
+                        numeroCama   = patient.numeroCama
+                        diagnostico  = patient.diagnostico
+                        lookupState  = LookupState.INACTIVE
+                    }
+                }
+            }
+            .addOnFailureListener {
+                lookupState  = LookupState.NOT_FOUND
+                foundPatient = null
+                Toast.makeText(context, "Error al consultar paciente", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    val formValidNotFound =
+        lookupState == LookupState.NOT_FOUND &&
+                nombre.isNotBlank() && apellido.isNotBlank() && genero.isNotBlank() &&
+                noDoc.length == 10 && fechaNacimiento.isNotBlank() && rh.isNotBlank() &&
+                numeroCama.isNotBlank() && numeroCama.length <= 2 && diagnostico.isNotBlank()
+
+    val formValidInactive =
+        lookupState == LookupState.INACTIVE &&
+                numeroCama.isNotBlank() && numeroCama.length <= 2 && diagnostico.isNotBlank()
+
+    val formValid = formValidNotFound || formValidInactive
+
+    // ── Diálogo: paciente ACTIVO ──────────────────────────────────────────
+    if (showActiveDialog) {
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(16.dp),
+            title = null,
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFCEBEB)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.PersonOff,
+                            contentDescription = null,
+                            tint = Color(0xFFA32D2D),
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Paciente activo",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Este paciente ya tiene una hospitalización en curso y no puede ser registrado nuevamente.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 22.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showActiveDialog = false; noDoc = ""; resetForm() },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFA32D2D),
+                        contentColor   = Color(0xFFF7C1C1)
+                    )
+                ) { Text("Entendido", fontWeight = FontWeight.Medium) }
+            }
+        )
+    }
+
+    // ── Diálogo: cama OCUPADA ─────────────────────────────────────────────
+    if (showCamaDialog) {
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(16.dp),
+            title = null,
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFCEBEB)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.Bed,
+                            contentDescription = null,
+                            tint = Color(0xFFA32D2D),
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Cama no disponible",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        buildAnnotatedString {
+                            append("La cama ")
+                            withStyle(SpanStyle(
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )) { append(numeroCama) }
+                            append(" está ocupada por ")
+                            withStyle(SpanStyle(
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )) { append(camaOcupadaPor) }
+                            append(". Por favor asigne una cama diferente.")
+                        },
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 22.sp
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    Button(
+                        onClick = { showCamaDialog = false },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFA32D2D),
+                            contentColor   = Color(0xFFF7C1C1)
+                        )
+                    ) { Text("Entendido", fontWeight = FontWeight.Medium) }
+                }
+            },
+            confirmButton = {}
+        )
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text("Registrar Paciente", color = Color.White, fontWeight = FontWeight.Bold)
-                },
+                title = { Text("Registrar Paciente", color = Color.White, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
@@ -101,137 +289,295 @@ fun RegisterScreen(
                 .background(Color.White)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp)
-                .pointerInput(Unit){
-                    detectTapGestures(onTap = { focusManager.clearFocus() })
-                }
+                .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
         ) {
             Text("Datos del Paciente", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkBlue)
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
-            FormField("Nombre *", nombre, { nombre = it }, "Ej: Juan")
-            Spacer(modifier = Modifier.height(14.dp))
-
-            FormField("Apellido *", apellido, { apellido = it }, "Ej: Pérez")
-            Spacer(modifier = Modifier.height(14.dp))
-
-            DropdownField(
-                label = "Género *",
-                value = genero,
-                items = generos,
-                expanded = generoExpanded,
-                onExpandedChange = { generoExpanded = !generoExpanded },
-                onSelect = { selected -> genero = selected; generoExpanded = false }
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-
+            // ── Documento ─────────────────────────────────────────────────
             LimitedFormField(
-                label = "Documento paciente *",
-                value = noDoc,
-                onChange = { noDoc = it },
-                placeholder = "10 dígitos",
-                keyboardType = KeyboardType.Number,
-                maxLength = 10,
-                minLength = 10
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Text("Fecha nacimiento *", color = DarkBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            Spacer(modifier = Modifier.height(6.dp))
-            OutlinedTextField(
-                value = fechaNacimiento,
-                onValueChange = {},
-                readOnly = true,
-                placeholder = { Text("DD/MM/AAAA", color = LightGray) },
-                trailingIcon = {
-                    IconButton(onClick = { datePickerDialog.show() }) {
-                        Icon(Icons.Outlined.CalendarMonth, contentDescription = null)
-                    }
+                label        = "Documento paciente *",
+                value        = noDoc,
+                onChange     = { new ->
+                    noDoc = new
+                    if (new.length != 10) resetForm() else lookupPatient(new)
                 },
+                placeholder  = "10 dígitos",
+                keyboardType = KeyboardType.Number,
+                maxLength    = 10,
+                minLength    = 10
+            )
+
+            if (lookupState == LookupState.LOADING) {
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = DarkBlue)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Consultando paciente…", fontSize = 13.sp, color = Color.Gray)
+                }
+            }
+
+            if (lookupState == LookupState.INACTIVE) {
+                Spacer(Modifier.height(12.dp))
+                Card(
+                    shape  = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+                ) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("ℹ️", fontSize = 18.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "Paciente encontrado como inactivo. Datos cargados automáticamente. " +
+                                    "Asigne una cama y diagnóstico, luego presione Registrar.",
+                            fontSize = 13.sp, color = Color(0xFF0D47A1), lineHeight = 19.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // ── Nombre ────────────────────────────────────────────────────
+            if (isReadOnly) ReadOnlyField("Nombre", foundPatient?.nombre ?: "")
+            else            FormField("Nombre *", nombre, { nombre = it }, "Ej: Juan")
+            Spacer(Modifier.height(14.dp))
+
+            // ── Apellido ──────────────────────────────────────────────────
+            if (isReadOnly) ReadOnlyField("Apellido", foundPatient?.apellido ?: "")
+            else            FormField("Apellido *", apellido, { apellido = it }, "Ej: Pérez")
+            Spacer(Modifier.height(14.dp))
+
+            // ── Género ────────────────────────────────────────────────────
+            if (isReadOnly) {
+                ReadOnlyField("Género", foundPatient?.genero ?: "")
+            } else {
+                DropdownField(
+                    label            = "Género *",
+                    value            = genero,
+                    items            = generos,
+                    expanded         = generoExpanded,
+                    onExpandedChange = { generoExpanded = !generoExpanded },
+                    onSelect         = { genero = it; generoExpanded = false }
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+
+            // ── Fecha de nacimiento ───────────────────────────────────────
+            // Box encima del OutlinedTextField (siempre disabled) captura el tap
+            // en todo el recuadro y abre el DatePicker solo cuando no es readonly.
+            Text("Fecha nacimiento *", color = DarkBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(6.dp))
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { datePickerDialog.show() },
-                shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DarkBlue,
-                    unfocusedBorderColor = LightGray,
-                    disabledBorderColor = LightGray,
-                    disabledTextColor = Color.Black,
-                    disabledPlaceholderColor = LightGray
-                ),
-                enabled = false
-            )
-            Spacer(modifier = Modifier.height(14.dp))
+                    .then(if (!isReadOnly) Modifier.clickable { datePickerDialog.show() } else Modifier)
+            ) {
+                OutlinedTextField(
+                    value         = if (isReadOnly) foundPatient?.fechaNacimiento ?: "" else fechaNacimiento,
+                    onValueChange = {},
+                    readOnly      = true,
+                    enabled       = false,
+                    placeholder   = { Text("DD/MM/AAAA", color = LightGray) },
+                    trailingIcon  = {
+                        if (!isReadOnly) Icon(Icons.Outlined.CalendarMonth, contentDescription = null)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape    = RoundedCornerShape(8.dp),
+                    colors   = OutlinedTextFieldDefaults.colors(
+                        disabledBorderColor       = if (isReadOnly) Color(0xFF4CAF50) else LightGray,
+                        disabledTextColor         = Color.Black,
+                        disabledPlaceholderColor  = LightGray,
+                        disabledTrailingIconColor = Color.DarkGray
+                    )
+                )
+            }
+            Spacer(Modifier.height(14.dp))
 
-            DropdownField(
-                label = "Tipo de sangre *",
-                value = rh,
-                items = tiposDeSangre,
-                expanded = rhExpanded,
-                onExpandedChange = { rhExpanded = !rhExpanded },
-                onSelect = { selected -> rh = selected; rhExpanded = false }
-            )
-            Spacer(modifier = Modifier.height(14.dp))
+            // ── Tipo de sangre ────────────────────────────────────────────
+            if (isReadOnly) {
+                ReadOnlyField("Tipo de sangre", foundPatient?.rh ?: "")
+            } else {
+                DropdownField(
+                    label            = "Tipo de sangre *",
+                    value            = rh,
+                    items            = tiposDeSangre,
+                    expanded         = rhExpanded,
+                    onExpandedChange = { rhExpanded = !rhExpanded },
+                    onSelect         = { rh = it; rhExpanded = false }
+                )
+            }
+            Spacer(Modifier.height(14.dp))
 
+            // ── Número de cama: SIEMPRE editable ─────────────────────────
             LimitedFormField(
-                label = "Número de cama *",
-                value = numeroCama,
-                onChange = { numeroCama = it },
-                placeholder = "Máx. 2 caracteres",
+                label        = "Número de cama *",
+                value        = numeroCama,
+                onChange     = { numeroCama = it },
+                placeholder  = "Máx. 2 caracteres",
                 keyboardType = KeyboardType.Number,
-                maxLength = 2,
-                minLength = 1
+                maxLength    = 2,
+                minLength    = 1
             )
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(Modifier.height(14.dp))
 
+            // ── Diagnóstico: SIEMPRE editable ─────────────────────────────
             FormField("Diagnóstico *", diagnostico, { diagnostico = it }, "Ej: Neumonía")
-            Spacer(modifier = Modifier.height(32.dp))
 
+            Spacer(Modifier.height(32.dp))
+
+            // ── Botones ───────────────────────────────────────────────────
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
-                    onClick = onCancelClick,
+                    onClick  = onCancelClick,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, DarkBlue)
-                ) {
-                    Text("Cancelar", color = DarkBlue)
-                }
+                    shape    = RoundedCornerShape(10.dp),
+                    border   = BorderStroke(1.dp, DarkBlue)
+                ) { Text("Cancelar", color = DarkBlue) }
+
                 Button(
                     onClick = {
-                        val patient = Patient(
-                            nombre = nombre,
-                            apellido = apellido,
-                            genero = genero,
-                            noDoc = noDoc,
-                            fechaNacimiento = fechaNacimiento,
-                            rh = rh,
-                            numeroCama = numeroCama,
-                            diagnostico = diagnostico
-                        )
-                        db.collection("pacientes").add(patient).addOnSuccessListener {
-                            Toast.makeText(context, "Paciente registrado", Toast.LENGTH_LONG).show()
-                            onRegisterClick(patient)
-                        }
+                        isRegistering = true
+                        // 1️⃣ Verificar cama libre (ignorar al propio paciente en INACTIVE)
+                        db.collection("pacientes")
+                            .whereEqualTo("numeroCama", numeroCama)
+                            .whereEqualTo("activo", true)
+                            .get()
+                            .addOnSuccessListener { result ->
+                                val ocupante = result.documents.firstOrNull { s ->
+                                    s.getString("noDoc") != noDoc
+                                }
+                                if (ocupante != null) {
+                                    val n = "${ocupante.getString("nombre") ?: ""} ${ocupante.getString("apellido") ?: ""}".trim()
+                                    camaOcupadaPor = n.ifBlank { "otro paciente" }
+                                    showCamaDialog = true
+                                    isRegistering  = false
+                                } else {
+                                    when (lookupState) {
+
+                                        // ── INACTIVE: solo actualizar cama y diagnóstico ──
+                                        // activo=true lo pone ConsentScreen al confirmar
+                                        LookupState.INACTIVE -> {
+                                            val patient = foundPatient!!.copy(
+                                                numeroCama  = numeroCama,
+                                                diagnostico = diagnostico
+                                            )
+                                            db.collection("pacientes")
+                                                .whereEqualTo("noDoc", noDoc)
+                                                .get()
+                                                .addOnSuccessListener { snap ->
+                                                    val docRef = snap.documents.firstOrNull()?.reference
+                                                    if (docRef == null) {
+                                                        isRegistering = false
+                                                        Toast.makeText(context, "Paciente no encontrado", Toast.LENGTH_SHORT).show()
+                                                        return@addOnSuccessListener
+                                                    }
+                                                    docRef.update(
+                                                        "numeroCama",  numeroCama,
+                                                        "diagnostico", diagnostico
+                                                        // activo se mantiene false; ConsentScreen lo pone en true
+                                                    ).addOnSuccessListener {
+                                                        isRegistering = false
+                                                        onRegisterClick(patient)   // → MainActivity navega a "consent"
+                                                    }.addOnFailureListener { e ->
+                                                        isRegistering = false
+                                                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    isRegistering = false
+                                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                }
+                                        }
+
+                                        // ── NOT_FOUND: crear paciente nuevo ──────────────
+                                        // activo=false; ConsentScreen lo pone en true
+                                        LookupState.NOT_FOUND -> {
+                                            val patient = Patient(
+                                                nombre          = nombre,
+                                                apellido        = apellido,
+                                                genero          = genero,
+                                                noDoc           = noDoc,
+                                                fechaNacimiento = fechaNacimiento,
+                                                rh              = rh,
+                                                numeroCama      = numeroCama,
+                                                diagnostico     = diagnostico
+                                            )
+                                            db.collection("pacientes")
+                                                .add(hashMapOf(
+                                                    "nombre"          to patient.nombre,
+                                                    "apellido"        to patient.apellido,
+                                                    "genero"          to patient.genero,
+                                                    "noDoc"           to patient.noDoc,
+                                                    "fechaNacimiento" to patient.fechaNacimiento,
+                                                    "rh"              to patient.rh,
+                                                    "numeroCama"      to patient.numeroCama,
+                                                    "diagnostico"     to patient.diagnostico,
+                                                    "activo"          to false   // ConsentScreen lo activa
+                                                ))
+                                                .addOnSuccessListener {
+                                                    isRegistering = false
+                                                    onRegisterClick(patient)   // → MainActivity navega a "consent"
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    isRegistering = false
+                                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                }
+                                        }
+
+                                        else -> { isRegistering = false }
+                                    }
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                isRegistering = false
+                                Toast.makeText(context, "Error al verificar cama: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
                     },
-                    enabled = formValid,
+                    enabled  = formValid && !isRegistering,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    border = if (formValid) null else BorderStroke(1.dp, LightGray),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = DarkBlue,
-                        contentColor = Color.White,
+                    shape    = RoundedCornerShape(10.dp),
+                    border   = if (formValid && !isRegistering) null else BorderStroke(1.dp, LightGray),
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor         = DarkBlue,
+                        contentColor           = Color.White,
                         disabledContainerColor = Color.White,
-                        disabledContentColor = LightGray
+                        disabledContentColor   = LightGray
                     )
                 ) {
-                    Text("Registrar", fontWeight = FontWeight.SemiBold)
+                    if (isRegistering) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                    } else {
+                        Text("Registrar", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(20.dp))
+
+            Spacer(Modifier.height(20.dp))
         }
     }
+}
+
+// ── Composables reutilizables ─────────────────────────────────────────────────
+
+@Composable
+fun ReadOnlyField(label: String, value: String) {
+    Text(label, color = DarkBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    Spacer(Modifier.height(6.dp))
+    OutlinedTextField(
+        value         = value,
+        onValueChange = {},
+        readOnly      = true,
+        enabled       = false,
+        modifier      = Modifier.fillMaxWidth(),
+        shape         = RoundedCornerShape(8.dp),
+        colors        = OutlinedTextFieldDefaults.colors(
+            disabledBorderColor = Color(0xFF4CAF50),
+            disabledTextColor   = Color.Black
+        )
+    )
 }
 
 @Composable
@@ -242,18 +588,18 @@ fun FormField(
     placeholder: String,
     keyboardType: KeyboardType = KeyboardType.Text
 ) {
-    Text(text = label, color = DarkBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-    Spacer(modifier = Modifier.height(6.dp))
+    Text(label, color = DarkBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    Spacer(Modifier.height(6.dp))
     OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        placeholder = { Text(placeholder, color = LightGray) },
+        value           = value,
+        onValueChange   = onChange,
+        placeholder     = { Text(placeholder, color = LightGray) },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        singleLine = true,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = DarkBlue,
+        modifier        = Modifier.fillMaxWidth(),
+        shape           = RoundedCornerShape(8.dp),
+        singleLine      = true,
+        colors          = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor   = DarkBlue,
             unfocusedBorderColor = LightGray
         )
     )
@@ -269,22 +615,22 @@ fun LimitedFormField(
     maxLength: Int,
     minLength: Int = 1
 ) {
-    val isError = value.isNotEmpty() && value.length < minLength
-    val isComplete = value.length >= minLength && value.length <= maxLength && value.isNotEmpty()
+    val isError    = value.isNotEmpty() && value.length < minLength
+    val isComplete = value.length in minLength..maxLength && value.isNotEmpty()
 
-    Text(text = label, color = DarkBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-    Spacer(modifier = Modifier.height(6.dp))
+    Text(label, color = DarkBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    Spacer(Modifier.height(6.dp))
     OutlinedTextField(
-        value = value,
-        onValueChange = { if (it.length <= maxLength) onChange(it) },
-        placeholder = { Text(placeholder, color = LightGray) },
+        value           = value,
+        onValueChange   = { if (it.length <= maxLength) onChange(it) },
+        placeholder     = { Text(placeholder, color = LightGray) },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        singleLine = true,
-        isError = isError,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = when {
+        modifier        = Modifier.fillMaxWidth(),
+        shape           = RoundedCornerShape(8.dp),
+        singleLine      = true,
+        isError         = isError,
+        colors          = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor   = when {
                 isComplete -> Color(0xFF4CAF50)
                 isError    -> Color(0xFFF44336)
                 else       -> DarkBlue
@@ -296,27 +642,24 @@ fun LimitedFormField(
             }
         ),
         supportingText = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    text = when {
+                    text     = when {
                         isError    -> "Mínimo $minLength caracteres"
                         isComplete -> "✓ Correcto"
                         else       -> ""
                     },
                     fontSize = 11.sp,
-                    color = when {
+                    color    = when {
                         isError    -> Color(0xFFF44336)
                         isComplete -> Color(0xFF4CAF50)
                         else       -> Color.Transparent
                     }
                 )
                 Text(
-                    text = "${value.length}/$maxLength",
+                    text     = "${value.length}/$maxLength",
                     fontSize = 11.sp,
-                    color = if (isComplete) Color(0xFF4CAF50) else LightGray
+                    color    = if (isComplete) Color(0xFF4CAF50) else LightGray
                 )
             }
         }
@@ -333,19 +676,19 @@ fun DropdownField(
     onExpandedChange: () -> Unit,
     onSelect: (String) -> Unit
 ) {
-    Text(text = label, color = DarkBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-    Spacer(modifier = Modifier.height(6.dp))
+    Text(label, color = DarkBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    Spacer(Modifier.height(6.dp))
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { onExpandedChange() }) {
         OutlinedTextField(
-            value = value,
+            value         = value,
             onValueChange = {},
-            readOnly = true,
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            placeholder = { Text("Seleccione", color = LightGray) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = DarkBlue,
+            readOnly      = true,
+            modifier      = Modifier.menuAnchor().fillMaxWidth(),
+            shape         = RoundedCornerShape(8.dp),
+            placeholder   = { Text("Seleccione", color = LightGray) },
+            trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors        = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor   = DarkBlue,
                 unfocusedBorderColor = LightGray
             )
         )
