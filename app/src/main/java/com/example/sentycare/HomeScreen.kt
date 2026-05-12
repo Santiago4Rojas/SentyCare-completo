@@ -13,9 +13,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -278,9 +279,6 @@ fun HomeScreen(
                     DrawerInfoRow("Apellido", SesionState.usuario.apellido.ifBlank { "—" })
                     DrawerInfoRow("Documento", SesionState.usuario.noDoc.ifBlank { "—" })
                     DrawerInfoRow("RH", SesionState.usuario.rh.ifBlank { "—" })
-                    if (SesionState.usuario.nivel.isNotBlank()) {
-                        DrawerInfoRow("Nivel", SesionState.usuario.nivel)
-                    }
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -363,21 +361,24 @@ fun HomeScreen(
                 }
 
                 // Sort filter chips
-                LazyRow(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFF0F4F8))
+                        .background(Color(0xFFE8EEF7))
+                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(SortBy.entries) { option ->
+                    SortBy.entries.forEach { option ->
                         FilterChip(
                             selected = sortBy == option,
                             onClick = { sortBy = option },
                             label = { Text(option.label, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = DarkBlue,
-                                selectedLabelColor = Color.White
+                                selectedLabelColor = Color.White,
+                                containerColor = Color.White,
+                                labelColor = DarkBlue
                             ),
                             border = FilterChipDefaults.filterChipBorder(
                                 enabled = true,
@@ -389,6 +390,7 @@ fun HomeScreen(
                     }
                 }
 
+                val listState = rememberLazyListState()
                 if (sortedPatients.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -401,6 +403,7 @@ fun HomeScreen(
                     }
                 } else {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(top = 16.dp, bottom = 88.dp)

@@ -71,7 +71,6 @@ fun AdminScreen(
                                 "email"        to email,
                                 "rol"          to usuario.rol,
                                 "especialidad" to usuario.especialidad,
-                                "nivel"        to usuario.nivel,
                                 "noDoc"        to usuario.noDoc,
                                 "rh"           to usuario.rh,
                                 "activo"       to true,
@@ -226,9 +225,6 @@ fun UsuarioCard(usuario: Usuario, onEditar: () -> Unit) {
                         Text(usuario.especialidad, fontSize = 11.sp, color = Color.Gray)
                     }
                 }
-                if (usuario.nivel.isNotBlank()) {
-                    Text(usuario.nivel, fontSize = 11.sp, color = Color(0xFF888888))
-                }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 IconButton(onClick = onEditar) {
@@ -259,15 +255,16 @@ fun RolChip(rol: Rol) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditarUsuarioDialog(usuario: Usuario, onDismiss: () -> Unit, onGuardar: (Map<String, Any>) -> Unit) {
+    val tiposDeSangre = listOf("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
     var nombre by remember { mutableStateOf(usuario.nombre) }
     var apellido by remember { mutableStateOf(usuario.apellido) }
     var rolSeleccionado by remember { mutableStateOf(Rol.fromString(usuario.rol)) }
     var especialidad by remember { mutableStateOf(usuario.especialidad) }
-    var nivel by remember { mutableStateOf(usuario.nivel) }
     var noDoc by remember { mutableStateOf(usuario.noDoc) }
     var rh by remember { mutableStateOf(usuario.rh) }
     var activo by remember { mutableStateOf(usuario.activo) }
     var showRolMenu by remember { mutableStateOf(false) }
+    var showRhMenu by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -293,9 +290,28 @@ fun EditarUsuarioDialog(usuario: Usuario, onDismiss: () -> Unit, onGuardar: (Map
                 }
 
                 OutlinedTextField(value = especialidad, onValueChange = { especialidad = it }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = nivel, onValueChange = { nivel = it }, label = { Text("Nivel") }, placeholder = { Text("Ej: Senior, Residente R1...") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = noDoc, onValueChange = { noDoc = it }, label = { Text("Documento de identidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = rh, onValueChange = { rh = it }, label = { Text("RH / Tipo de sangre") }, placeholder = { Text("Ej: O+, A-, B+...") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(
+                    value = noDoc,
+                    onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) noDoc = it },
+                    label = { Text("Documento de identidad") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true,
+                    supportingText = { Text("6–10 dígitos", fontSize = 11.sp, color = Color.Gray) }
+                )
+                ExposedDropdownMenuBox(expanded = showRhMenu, onExpandedChange = { showRhMenu = it }) {
+                    OutlinedTextField(
+                        value = rh, onValueChange = {}, readOnly = true,
+                        label = { Text("RH / Tipo de sangre") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showRhMenu) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(8.dp)
+                    )
+                    ExposedDropdownMenu(expanded = showRhMenu, onDismissRequest = { showRhMenu = false }) {
+                        tiposDeSangre.forEach { tipo ->
+                            DropdownMenuItem(text = { Text(tipo) }, onClick = { rh = tipo; showRhMenu = false })
+                        }
+                    }
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = activo, onCheckedChange = { activo = it }, colors = CheckboxDefaults.colors(checkedColor = DarkBlue))
@@ -311,7 +327,6 @@ fun EditarUsuarioDialog(usuario: Usuario, onDismiss: () -> Unit, onGuardar: (Map
                         "apellido"     to apellido,
                         "rol"          to rolSeleccionado.name,
                         "especialidad" to especialidad,
-                        "nivel"        to nivel,
                         "noDoc"        to noDoc,
                         "rh"           to rh,
                         "activo"       to activo
@@ -335,12 +350,13 @@ fun CrearUsuarioDialog(onDismiss: () -> Unit, onCrear: (String, String, Usuario)
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    val tiposDeSangre = listOf("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
     var rolSeleccionado by remember { mutableStateOf(Rol.ENFERMERA) }
     var especialidad by remember { mutableStateOf("") }
-    var nivel by remember { mutableStateOf("") }
     var noDoc by remember { mutableStateOf("") }
     var rh by remember { mutableStateOf("") }
     var showRolMenu by remember { mutableStateOf(false) }
+    var showRhMenu by remember { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
     var showConfirm by remember { mutableStateOf(false) }
 
@@ -412,15 +428,34 @@ fun CrearUsuarioDialog(onDismiss: () -> Unit, onCrear: (String, String, Usuario)
                 }
 
                 OutlinedTextField(value = especialidad, onValueChange = { especialidad = it }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = nivel, onValueChange = { nivel = it }, label = { Text("Nivel") }, placeholder = { Text("Ej: Senior, Residente R1...") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = noDoc, onValueChange = { noDoc = it }, label = { Text("Documento de identidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = rh, onValueChange = { rh = it }, label = { Text("RH / Tipo de sangre") }, placeholder = { Text("Ej: O+, A-, B+...") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(
+                    value = noDoc,
+                    onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) noDoc = it },
+                    label = { Text("Documento de identidad") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true,
+                    supportingText = { Text("6–10 dígitos", fontSize = 11.sp, color = Color.Gray) }
+                )
+                ExposedDropdownMenuBox(expanded = showRhMenu, onExpandedChange = { showRhMenu = it }) {
+                    OutlinedTextField(
+                        value = rh, onValueChange = {}, readOnly = true,
+                        label = { Text("RH / Tipo de sangre") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showRhMenu) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(8.dp)
+                    )
+                    ExposedDropdownMenu(expanded = showRhMenu, onDismissRequest = { showRhMenu = false }) {
+                        tiposDeSangre.forEach { tipo ->
+                            DropdownMenuItem(text = { Text(tipo) }, onClick = { rh = tipo; showRhMenu = false })
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    val usuario = Usuario(nombre = nombre, apellido = apellido, rol = rolSeleccionado.name, especialidad = especialidad, nivel = nivel, noDoc = noDoc, rh = rh)
+                    val usuario = Usuario(nombre = nombre, apellido = apellido, rol = rolSeleccionado.name, especialidad = especialidad, noDoc = noDoc, rh = rh)
                     onCrear(email, password, usuario)
                 },
                 enabled = esValido,

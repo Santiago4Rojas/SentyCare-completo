@@ -140,7 +140,6 @@ fun ComfortBScreen(
             "evaluadorId"                to SesionState.usuario.uid,
             "evaluadorNombre"            to SesionState.usuario.nombreCompleto,
             "evaluadorEspecialidad"      to SesionState.usuario.especialidad,
-            "evaluadorNivel"             to SesionState.usuario.nivel,
             "recomendacionesAutomaticas" to comfortRecomendaciones(totalScore),
             "recomendacionMedico"        to recomendacionMedico,
             "recomendacionIA"            to "",
@@ -180,7 +179,7 @@ fun ComfortBScreen(
     BackHandler {
         when {
             step == 0 -> onBackClick()
-            step <= 6 -> step--
+            step <= 5 -> step--
             guardado -> onBackClick()
             else -> showBackConfirm = true
         }
@@ -191,13 +190,13 @@ fun ComfortBScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = when { step < 6 -> "COMFORT B"; step == 6 -> "Resumen"; else -> "Resultado" },
+                        text = if (step < 6) "COMFORT B" else "Resultado",
                         color = Color.White
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = {
-                        when { step == 0 -> onBackClick(); step <= 6 -> step--; guardado -> onBackClick(); else -> showBackConfirm = true }
+                        when { step == 0 -> onBackClick(); step <= 5 -> step--; guardado -> onBackClick(); else -> showBackConfirm = true }
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                     }
@@ -220,7 +219,6 @@ fun ComfortBScreen(
                     onSelect = { scores[current] = it },
                     onNext = { if (current == 5) step = 6 else step++ }
                 )
-                current == 6 -> SummaryStep(total = totalScore, onVerResult = { step = 7 })
                 else -> ResultStep(
                     total = totalScore,
                     pacienteNombre = "${patient.nombre} ${patient.apellido}",
@@ -345,7 +343,7 @@ fun CategoryStep(
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = DarkBlue, disabledContainerColor = LightGray)
             ) {
-                Text(if (stepIndex == 5) "Ver resumen →" else "Siguiente →", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (stepIndex == 5) "Ver resultado →" else "Siguiente →", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }

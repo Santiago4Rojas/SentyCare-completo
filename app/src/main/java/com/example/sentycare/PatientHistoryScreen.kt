@@ -1,19 +1,14 @@
 package com.example.sentycare
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Assessment
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,7 +37,6 @@ data class Evaluacion(
     val evaluadorId: String = "",
     val evaluadorNombre: String = "",
     val evaluadorEspecialidad: String = "",
-    val evaluadorNivel: String = "",
     val recomendacionMedico: String = "",
     val recomendacionIA: String = ""
 )
@@ -231,9 +225,9 @@ fun PatientHistoryScreen(
                 }
 
                 else -> {
-                    if (!isSelecting) {
+                    if (selectedIds.isEmpty()) {
                         Text(
-                            "Mantén presionada una evaluación\npara seleccionarla y exportar PDF",
+                            "Selecciona evaluaciones con el checkbox para exportar PDF",
                             fontSize = 11.sp,
                             color = Color.Gray,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -248,8 +242,6 @@ fun PatientHistoryScreen(
                             SelectableEvaluationCard(
                                 item = item,
                                 isSelected = isSelected,
-                                isSelecting = isSelecting,
-                                onLongClick = { selectedIds = selectedIds + item.id },
                                 onToggle = {
                                     selectedIds = if (isSelected) selectedIds - item.id else selectedIds + item.id
                                 }
@@ -263,45 +255,32 @@ fun PatientHistoryScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SelectableEvaluationCard(
     item: Evaluacion,
     isSelected: Boolean,
-    isSelecting: Boolean,
-    onLongClick: () -> Unit,
     onToggle: () -> Unit
 ) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .border(if (isSelected) 2.dp else 0.dp, if (isSelected) DarkBlue else Color.Transparent, RoundedCornerShape(12.dp))
-            .combinedClickable(
-                onClick = { if (isSelecting) onToggle() },
-                onLongClick = { if (!isSelecting) onLongClick() }
-            )
+            .clickable { onToggle() },
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        EvaluationCard(item)
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(DarkBlue),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Outlined.CheckCircle, null, tint = Color.White, modifier = Modifier.size(18.dp))
-            }
-        }
+        Checkbox(
+            checked = isSelected,
+            onCheckedChange = { onToggle() },
+            colors = CheckboxDefaults.colors(checkedColor = DarkBlue),
+            modifier = Modifier.padding(end = 4.dp)
+        )
+        EvaluationCard(item, modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
 fun EvaluationCard(
-    item: Evaluacion
+    item: Evaluacion,
+    modifier: Modifier = Modifier
 ) {
 
     val fechaTexto =
@@ -327,7 +306,7 @@ fun EvaluationCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         elevation =
             CardDefaults.cardElevation(
@@ -394,7 +373,6 @@ fun EvaluationCard(
                 val evaluadorInfo = buildString {
                     append(item.evaluadorNombre)
                     if (item.evaluadorEspecialidad.isNotBlank()) append(" · ${item.evaluadorEspecialidad}")
-                    if (item.evaluadorNivel.isNotBlank()) append(" · ${item.evaluadorNivel}")
                 }
                 Text(
                     "Evaluado por: $evaluadorInfo",
