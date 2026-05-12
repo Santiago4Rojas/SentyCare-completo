@@ -137,6 +137,12 @@ fun LoginScreen(
                                 .document(uid)
                                 .get()
                                 .addOnSuccessListener { doc ->
+                                    val activo = doc.getBoolean("activo") ?: true
+                                    if (!activo) {
+                                        auth.signOut()
+                                        Toast.makeText(context, "Usuario inactivo. Contacte al administrador.", Toast.LENGTH_LONG).show()
+                                        return@addOnSuccessListener
+                                    }
                                     SesionState.usuario = SesionUsuario(
                                         uid          = uid,
                                         nombre       = doc.getString("nombre") ?: "Usuario",
@@ -144,7 +150,9 @@ fun LoginScreen(
                                         email        = email,
                                         rol          = Rol.fromString(doc.getString("rol") ?: ""),
                                         especialidad = doc.getString("especialidad") ?: "",
-                                        nivel        = doc.getString("nivel") ?: ""
+                                        nivel        = doc.getString("nivel") ?: "",
+                                        noDoc        = doc.getString("noDoc") ?: "",
+                                        rh           = doc.getString("rh") ?: ""
                                     )
                                     onLoginClick()
                                 }

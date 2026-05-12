@@ -111,6 +111,27 @@ fun RassScreen(
     var iaCargando by remember { mutableStateOf(false) }
     var guardado by remember { mutableStateOf(false) }
     var guardando by remember { mutableStateOf(false) }
+    var showBackConfirm by remember { mutableStateOf(false) }
+
+    if (showBackConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBackConfirm = false },
+            containerColor = androidx.compose.ui.graphics.Color.White,
+            shape = RoundedCornerShape(16.dp),
+            title = { Text("¿Salir sin guardar?", fontWeight = FontWeight.Bold, color = DarkBlue) },
+            text = { Text("La evaluación no ha sido guardada. Si sale ahora, se perderán los datos.", fontSize = 14.sp) },
+            confirmButton = {
+                Button(
+                    onClick = { showBackConfirm = false; onBackClick() },
+                    colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFFE53935)),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Salir", color = androidx.compose.ui.graphics.Color.White) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showBackConfirm = false }, shape = RoundedCornerShape(8.dp)) { Text("Quedarme") }
+            }
+        )
+    }
 
     fun guardarEvaluacion(score: Int, onSuccess: () -> Unit) {
         if (guardado || guardando) return
@@ -164,7 +185,11 @@ fun RassScreen(
     }
 
     BackHandler {
-        if (showResult) showResult = false else onBackClick()
+        when {
+            !showResult -> onBackClick()
+            guardado -> onBackClick()
+            else -> showBackConfirm = true
+        }
     }
 
     Scaffold(
@@ -172,7 +197,9 @@ fun RassScreen(
             TopAppBar(
                 title = { Text(if (showResult) "Resultado RASS" else "Escala RASS", color = Color.White) },
                 navigationIcon = {
-                    IconButton(onClick = { if (showResult) showResult = false else onBackClick() }) {
+                    IconButton(onClick = {
+                        when { !showResult -> onBackClick(); guardado -> onBackClick(); else -> showBackConfirm = true }
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                     }
                 },
@@ -191,6 +218,7 @@ fun RassScreen(
             selectedScore?.let { score ->
                 RassResultStep(
                     score = score,
+                    pacienteNombre = "${patient.nombre} ${patient.apellido}",
                     recomendacionMedico = recomendacionMedico,
                     onRecomendacionMedicoChange = { recomendacionMedico = it },
                     iaRecomendacion = iaRecomendacion,
@@ -294,6 +322,7 @@ fun RassSelectionStep(
 @Composable
 fun RassResultStep(
     score: Int,
+    pacienteNombre: String = "",
     recomendacionMedico: String = "",
     onRecomendacionMedicoChange: (String) -> Unit = {},
     iaRecomendacion: String = "",
@@ -422,6 +451,14 @@ fun RassResultStep(
                     Text("Guardar evaluación", color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        if (guardado) {
+            ReminderButton(
+                paciente = pacienteNombre,
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(modifier = Modifier.height(10.dp))
         }
 

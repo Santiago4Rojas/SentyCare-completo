@@ -34,6 +34,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Bed
 import androidx.compose.ui.draw.clip
 import com.example.sentycare.ui.theme.*
@@ -69,6 +70,14 @@ fun RegisterScreen(
     val tiposDeSangre  = listOf("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
     var generoExpanded by remember { mutableStateOf(false) }
     var rhExpanded     by remember { mutableStateOf(false) }
+    var camaExpanded   by remember { mutableStateOf(false) }
+    var camasTemporales by remember { mutableStateOf<List<String>>(emptyList()) }
+    var showAddCamaTempDialog by remember { mutableStateOf(false) }
+    var nuevaCamaTemp  by remember { mutableStateOf("") }
+
+    val camasDisponibles = remember(camasTemporales) {
+        (1..10).map { it.toString() } + camasTemporales
+    }
 
     var lookupState  by remember { mutableStateOf(LookupState.IDLE) }
     var foundPatient by remember { mutableStateOf<Patient?>(null) }
@@ -141,15 +150,54 @@ fun RegisterScreen(
             }
     }
 
+    if (showAddCamaTempDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddCamaTempDialog = false; nuevaCamaTemp = "" },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(16.dp),
+            title = { Text("Agregar cama temporal", fontWeight = FontWeight.Medium) },
+            text = {
+                OutlinedTextField(
+                    value = nuevaCamaTemp,
+                    onValueChange = { if (it.length <= 5) nuevaCamaTemp = it },
+                    label = { Text("Número o código de cama") },
+                    placeholder = { Text("Ej: T1, 11, UCI-3") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val cama = nuevaCamaTemp.trim()
+                        if (cama.isNotBlank()) {
+                            camasTemporales = camasTemporales + cama
+                            numeroCama = cama
+                        }
+                        showAddCamaTempDialog = false
+                        nuevaCamaTemp = ""
+                    },
+                    enabled = nuevaCamaTemp.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = DarkBlue),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Agregar") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showAddCamaTempDialog = false; nuevaCamaTemp = "" }, shape = RoundedCornerShape(8.dp)) { Text("Cancelar") }
+            }
+        )
+    }
+
     val formValidNotFound =
         lookupState == LookupState.NOT_FOUND &&
                 nombre.isNotBlank() && apellido.isNotBlank() && genero.isNotBlank() &&
                 noDoc.length == 10 && fechaNacimiento.isNotBlank() && rh.isNotBlank() &&
-                numeroCama.isNotBlank() && numeroCama.length <= 2 && diagnostico.isNotBlank()
+                numeroCama.isNotBlank() && diagnostico.isNotBlank()
 
     val formValidInactive =
         lookupState == LookupState.INACTIVE &&
-                numeroCama.isNotBlank() && numeroCama.length <= 2 && diagnostico.isNotBlank()
+                numeroCama.isNotBlank() && diagnostico.isNotBlank()
 
     val formValid = formValidNotFound || formValidInactive
 
@@ -410,16 +458,43 @@ fun RegisterScreen(
             }
             Spacer(Modifier.height(14.dp))
 
-            // ── Número de cama: SIEMPRE editable ─────────────────────────
-            LimitedFormField(
-                label        = "Número de cama *",
-                value        = numeroCama,
-                onChange     = { numeroCama = it },
-                placeholder  = "Máx. 2 caracteres",
-                keyboardType = KeyboardType.Number,
-                maxLength    = 2,
-                minLength    = 1
-            )
+            // ── Número de cama: dropdown con camas 1-10 + temporales ─────
+            Text("Número de cama *", color = DarkBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(6.dp))
+            ExposedDropdownMenuBox(expanded = camaExpanded, onExpandedChange = { camaExpanded = !camaExpanded }) {
+                OutlinedTextField(
+                    value = numeroCama,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    placeholder = { Text("Seleccione una cama", color = LightGray) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = camaExpanded) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = DarkBlue,
+                        unfocusedBorderColor = if (numeroCama.isNotBlank()) Color(0xFF4CAF50) else LightGray
+                    )
+                )
+                ExposedDropdownMenu(expanded = camaExpanded, onDismissRequest = { camaExpanded = false }) {
+                    camasDisponibles.forEach { cama ->
+                        DropdownMenuItem(
+                            text = { Text("Cama $cama") },
+                            onClick = { numeroCama = cama; camaExpanded = false }
+                        )
+                    }
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.Add, contentDescription = null, tint = DarkBlue, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Agregar cama temporal", color = DarkBlue, fontWeight = FontWeight.Medium)
+                            }
+                        },
+                        onClick = { camaExpanded = false; showAddCamaTempDialog = true }
+                    )
+                }
+            }
             Spacer(Modifier.height(14.dp))
 
             // ── Diagnóstico: SIEMPRE editable ─────────────────────────────

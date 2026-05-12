@@ -3,6 +3,7 @@ package com.example.sentycare
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sentycare.data.Rol
@@ -70,6 +72,8 @@ fun AdminScreen(
                                 "rol"          to usuario.rol,
                                 "especialidad" to usuario.especialidad,
                                 "nivel"        to usuario.nivel,
+                                "noDoc"        to usuario.noDoc,
+                                "rh"           to usuario.rh,
                                 "activo"       to true,
                                 "creadoEn"     to System.currentTimeMillis()
                             )
@@ -136,13 +140,60 @@ fun AdminScreen(
                 usuarios.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No hay usuarios registrados", color = LightGray)
                 }
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
-                ) {
-                    items(usuarios) { usuario ->
-                        UsuarioCard(usuario = usuario, onEditar = { showEditarDialog = usuario })
+                else -> {
+                    val activos = usuarios.filter { it.activo }
+                    val inactivos = usuarios.filter { !it.activo }
+                    var showInactivos by remember { mutableStateOf(false) }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
+                    ) {
+                        if (activos.isNotEmpty()) {
+                            item {
+                                Text(
+                                    "Usuarios activos (${activos.size})",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(bottom = 2.dp)
+                                )
+                            }
+                            items(activos) { usuario ->
+                                UsuarioCard(usuario = usuario, onEditar = { showEditarDialog = usuario })
+                            }
+                        }
+                        if (inactivos.isNotEmpty()) {
+                            item {
+                                Spacer(Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showInactivos = !showInactivos }
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "Usuarios inactivos (${inactivos.size})",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFE53935),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = if (showInactivos) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                                        contentDescription = null,
+                                        tint = Color(0xFFE53935),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            if (showInactivos) {
+                                items(inactivos) { usuario ->
+                                    UsuarioCard(usuario = usuario, onEditar = { showEditarDialog = usuario })
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -213,6 +264,8 @@ fun EditarUsuarioDialog(usuario: Usuario, onDismiss: () -> Unit, onGuardar: (Map
     var rolSeleccionado by remember { mutableStateOf(Rol.fromString(usuario.rol)) }
     var especialidad by remember { mutableStateOf(usuario.especialidad) }
     var nivel by remember { mutableStateOf(usuario.nivel) }
+    var noDoc by remember { mutableStateOf(usuario.noDoc) }
+    var rh by remember { mutableStateOf(usuario.rh) }
     var activo by remember { mutableStateOf(usuario.activo) }
     var showRolMenu by remember { mutableStateOf(false) }
 
@@ -241,6 +294,8 @@ fun EditarUsuarioDialog(usuario: Usuario, onDismiss: () -> Unit, onGuardar: (Map
 
                 OutlinedTextField(value = especialidad, onValueChange = { especialidad = it }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
                 OutlinedTextField(value = nivel, onValueChange = { nivel = it }, label = { Text("Nivel") }, placeholder = { Text("Ej: Senior, Residente R1...") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = noDoc, onValueChange = { noDoc = it }, label = { Text("Documento de identidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = rh, onValueChange = { rh = it }, label = { Text("RH / Tipo de sangre") }, placeholder = { Text("Ej: O+, A-, B+...") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = activo, onCheckedChange = { activo = it }, colors = CheckboxDefaults.colors(checkedColor = DarkBlue))
@@ -257,6 +312,8 @@ fun EditarUsuarioDialog(usuario: Usuario, onDismiss: () -> Unit, onGuardar: (Map
                         "rol"          to rolSeleccionado.name,
                         "especialidad" to especialidad,
                         "nivel"        to nivel,
+                        "noDoc"        to noDoc,
+                        "rh"           to rh,
                         "activo"       to activo
                     ))
                 },
@@ -277,12 +334,25 @@ fun CrearUsuarioDialog(onDismiss: () -> Unit, onCrear: (String, String, Usuario)
     var apellido by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var rolSeleccionado by remember { mutableStateOf(Rol.ENFERMERA) }
     var especialidad by remember { mutableStateOf("") }
     var nivel by remember { mutableStateOf("") }
+    var noDoc by remember { mutableStateOf("") }
+    var rh by remember { mutableStateOf("") }
     var showRolMenu by remember { mutableStateOf(false) }
+    var showPassword by remember { mutableStateOf(false) }
+    var showConfirm by remember { mutableStateOf(false) }
 
-    val esValido = nombre.isNotBlank() && email.isNotBlank() && password.length >= 6
+    val hasUpper = password.any { it.isUpperCase() }
+    val hasLower = password.any { it.isLowerCase() }
+    val hasDigit = password.any { it.isDigit() }
+    val hasSpecial = password.any { !it.isLetterOrDigit() }
+    val hasLength = password.length >= 8
+    val passwordsMatch = password == confirmPassword && password.isNotBlank()
+    val passwordValido = hasUpper && hasLower && hasDigit && hasSpecial && hasLength && passwordsMatch
+
+    val esValido = nombre.isNotBlank() && email.isNotBlank() && passwordValido
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -294,7 +364,39 @@ fun CrearUsuarioDialog(onDismiss: () -> Unit, onCrear: (String, String, Usuario)
                 OutlinedTextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre *") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
                 OutlinedTextField(value = apellido, onValueChange = { apellido = it }, label = { Text("Apellido") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
                 OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Correo electrónico *") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Contraseña * (mín. 6 caracteres)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true, visualTransformation = PasswordVisualTransformation())
+                OutlinedTextField(
+                    value = password, onValueChange = { password = it },
+                    label = { Text("Contraseña *") }, modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp), singleLine = true,
+                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showPassword = !showPassword }) {
+                            Icon(if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, null, tint = Color.Gray)
+                        }
+                    }
+                )
+                OutlinedTextField(
+                    value = confirmPassword, onValueChange = { confirmPassword = it },
+                    label = { Text("Confirmar contraseña *") }, modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp), singleLine = true,
+                    isError = confirmPassword.isNotBlank() && !passwordsMatch,
+                    visualTransformation = if (showConfirm) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showConfirm = !showConfirm }) {
+                            Icon(if (showConfirm) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, null, tint = Color.Gray)
+                        }
+                    }
+                )
+                if (password.isNotBlank()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        PasswordRequirement("Mínimo 8 caracteres", hasLength)
+                        PasswordRequirement("Mayúscula (A-Z)", hasUpper)
+                        PasswordRequirement("Minúscula (a-z)", hasLower)
+                        PasswordRequirement("Número (0-9)", hasDigit)
+                        PasswordRequirement("Carácter especial (!@#\$...)", hasSpecial)
+                        if (confirmPassword.isNotBlank()) PasswordRequirement("Contraseñas coinciden", passwordsMatch)
+                    }
+                }
 
                 ExposedDropdownMenuBox(expanded = showRolMenu, onExpandedChange = { showRolMenu = it }) {
                     OutlinedTextField(
@@ -311,12 +413,14 @@ fun CrearUsuarioDialog(onDismiss: () -> Unit, onCrear: (String, String, Usuario)
 
                 OutlinedTextField(value = especialidad, onValueChange = { especialidad = it }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
                 OutlinedTextField(value = nivel, onValueChange = { nivel = it }, label = { Text("Nivel") }, placeholder = { Text("Ej: Senior, Residente R1...") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = noDoc, onValueChange = { noDoc = it }, label = { Text("Documento de identidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = rh, onValueChange = { rh = it }, label = { Text("RH / Tipo de sangre") }, placeholder = { Text("Ej: O+, A-, B+...") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    val usuario = Usuario(nombre = nombre, apellido = apellido, rol = rolSeleccionado.name, especialidad = especialidad, nivel = nivel)
+                    val usuario = Usuario(nombre = nombre, apellido = apellido, rol = rolSeleccionado.name, especialidad = especialidad, nivel = nivel, noDoc = noDoc, rh = rh)
                     onCrear(email, password, usuario)
                 },
                 enabled = esValido,
