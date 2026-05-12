@@ -273,8 +273,8 @@ fun EditarUsuarioDialog(usuario: Usuario, onDismiss: () -> Unit, onGuardar: (Map
         title = { Text("Editar usuario", fontWeight = FontWeight.Bold, color = DarkBlue) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = apellido, onValueChange = { apellido = it }, label = { Text("Apellido") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = nombre, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) nombre = v }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = apellido, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) apellido = v }, label = { Text("Apellido") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
 
                 ExposedDropdownMenuBox(expanded = showRolMenu, onExpandedChange = { showRolMenu = it }) {
                     OutlinedTextField(
@@ -289,7 +289,7 @@ fun EditarUsuarioDialog(usuario: Usuario, onDismiss: () -> Unit, onGuardar: (Map
                     }
                 }
 
-                OutlinedTextField(value = especialidad, onValueChange = { especialidad = it }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = especialidad, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' || it == '.' }) especialidad = v }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
                 OutlinedTextField(
                     value = noDoc,
                     onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) noDoc = it },
@@ -377,8 +377,8 @@ fun CrearUsuarioDialog(onDismiss: () -> Unit, onCrear: (String, String, Usuario)
         title = { Text("Crear usuario", fontWeight = FontWeight.Bold, color = DarkBlue) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre *") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = apellido, onValueChange = { apellido = it }, label = { Text("Apellido") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = nombre, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) nombre = v }, label = { Text("Nombre *") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = apellido, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) apellido = v }, label = { Text("Apellido") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
                 OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Correo electrónico *") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
                 OutlinedTextField(
                     value = password, onValueChange = { password = it },
@@ -427,7 +427,7 @@ fun CrearUsuarioDialog(onDismiss: () -> Unit, onCrear: (String, String, Usuario)
                     }
                 }
 
-                OutlinedTextField(value = especialidad, onValueChange = { especialidad = it }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = especialidad, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' || it == '.' }) especialidad = v }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
                 OutlinedTextField(
                     value = noDoc,
                     onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) noDoc = it },

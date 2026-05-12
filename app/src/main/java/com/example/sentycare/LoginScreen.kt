@@ -151,7 +151,8 @@ fun LoginScreen(
                                         rol          = Rol.fromString(doc.getString("rol") ?: ""),
                                         especialidad = doc.getString("especialidad") ?: "",
                                         noDoc        = doc.getString("noDoc") ?: "",
-                                        rh           = doc.getString("rh") ?: ""
+                                        rh           = doc.getString("rh") ?: "",
+                                        fotoUrl      = doc.getString("fotoUrl") ?: ""
                                     )
                                     onLoginClick()
                                 }
