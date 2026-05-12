@@ -104,6 +104,27 @@ fun ComfortBScreen(
     var iaCargando by remember { mutableStateOf(false) }
     var guardado by remember { mutableStateOf(false) }
     var guardando by remember { mutableStateOf(false) }
+    var showBackConfirm by remember { mutableStateOf(false) }
+
+    if (showBackConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBackConfirm = false },
+            containerColor = Color.White,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            title = { Text("¿Salir sin guardar?", fontWeight = FontWeight.Bold, color = DarkBlue) },
+            text = { Text("La evaluación no ha sido guardada. Si sale ahora, se perderán los datos.", fontSize = 14.sp) },
+            confirmButton = {
+                Button(
+                    onClick = { showBackConfirm = false; onBackClick() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                ) { Text("Salir", color = Color.White) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showBackConfirm = false }, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) { Text("Quedarme") }
+            }
+        )
+    }
 
     fun guardarEvaluacion(onSuccess: () -> Unit) {
         if (guardado || guardando) return
@@ -160,7 +181,8 @@ fun ComfortBScreen(
         when {
             step == 0 -> onBackClick()
             step <= 6 -> step--
-            else -> step = 0
+            guardado -> onBackClick()
+            else -> showBackConfirm = true
         }
     }
 
@@ -175,7 +197,7 @@ fun ComfortBScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = {
-                        when { step == 0 -> onBackClick(); step <= 6 -> step--; else -> step = 0 }
+                        when { step == 0 -> onBackClick(); step <= 6 -> step--; guardado -> onBackClick(); else -> showBackConfirm = true }
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                     }
@@ -201,6 +223,7 @@ fun ComfortBScreen(
                 current == 6 -> SummaryStep(total = totalScore, onVerResult = { step = 7 })
                 else -> ResultStep(
                     total = totalScore,
+                    pacienteNombre = "${patient.nombre} ${patient.apellido}",
                     recomendacionMedico = recomendacionMedico,
                     onRecomendacionMedicoChange = { recomendacionMedico = it },
                     iaRecomendacion = iaRecomendacion,
@@ -389,6 +412,7 @@ fun SummaryStep(total: Int, onVerResult: () -> Unit) {
 @Composable
 fun ResultStep(
     total: Int,
+    pacienteNombre: String = "",
     recomendacionMedico: String = "",
     onRecomendacionMedicoChange: (String) -> Unit = {},
     iaRecomendacion: String = "",
@@ -522,6 +546,14 @@ fun ResultStep(
                     Text("Guardar evaluación", color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        if (guardado) {
+            ReminderButton(
+                paciente = pacienteNombre,
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(modifier = Modifier.height(10.dp))
         }
 

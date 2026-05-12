@@ -1,18 +1,27 @@
 package com.example.sentycare
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,6 +32,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 data class Evaluacion(
+    val id: String = "",
     val pacienteDocumento: String = "",
     val pacienteNombre: String = "",
     val escala: String = "",
@@ -48,60 +58,69 @@ fun PatientHistoryScreen(
 ) {
 
     val db = FirebaseFirestore.getInstance()
+    val context = LocalContext.current
 
-    var evaluaciones by remember {
-        mutableStateOf<List<Evaluacion>>(emptyList())
+    var evaluaciones by remember { mutableStateOf<List<Evaluacion>>(emptyList()) }
+    var cargando by remember { mutableStateOf(true) }
+    var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val isSelecting = selectedIds.isNotEmpty()
+
+    BackHandler {
+        if (isSelecting) selectedIds = emptySet() else onBackClick()
     }
-
-    var cargando by remember {
-        mutableStateOf(true)
-    }
-
-    BackHandler { onBackClick() }
 
     LaunchedEffect(Unit) {
-
         db.collection("evaluaciones")
-            .whereEqualTo(
-                "pacienteDocumento",
-                patient.noDoc
-            )
+            .whereEqualTo("pacienteDocumento", patient.noDoc)
             .get()
             .addOnSuccessListener { result ->
-
-                val lista =
-                    result.documents.mapNotNull {
-                        it.toObject(
-                            Evaluacion::class.java
-                        )
-                    }
-                        .sortedByDescending {
-                            it.fecha
-                        }
-
-                evaluaciones = lista
+                evaluaciones = result.documents.mapNotNull { doc ->
+                    doc.toObject(Evaluacion::class.java)?.copy(id = doc.id)
+                }.sortedByDescending { it.fecha }
                 cargando = false
             }
-            .addOnFailureListener {
-                cargando = false
-            }
+            .addOnFailureListener { cargando = false }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Historial", color = Color.White, fontWeight = FontWeight.Bold) },
+                title = {
+                    if (isSelecting)
+                        Text("${selectedIds.size} seleccionada(s)", color = Color.White, fontWeight = FontWeight.Bold)
+                    else
+                        Text("Historial", color = Color.White, fontWeight = FontWeight.Bold)
+                },
+                navigationIcon = {
+                    if (isSelecting) {
+                        IconButton(onClick = { selectedIds = emptySet() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                        }
+                    }
+                },
+                actions = {
+                    if (isSelecting) {
+                        IconButton(onClick = {
+                            val seleccionadas = evaluaciones.filter { it.id in selectedIds }
+                            PdfExportHelper.generarYCompartirPdf(context, patient, seleccionadas)
+                        }) {
+                            Icon(Icons.Outlined.PictureAsPdf, contentDescription = "Exportar PDF", tint = Color.White)
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBlue)
             )
         },
         bottomBar = {
-            SentyCareBottomBar(
-                currentTab = SentyCareTab.HISTORIAL,
-                onInicioClick = onHomeClick,
-                onEvaluacionClick = onEvaluacionClick,
-                onHistorialClick = {},
-                onInfoClick = onInfoClick
-            )
+            if (!isSelecting) {
+                SentyCareBottomBar(
+                    currentTab = SentyCareTab.HISTORIAL,
+                    onInicioClick = onHomeClick,
+                    onEvaluacionClick = onEvaluacionClick,
+                    onHistorialClick = {},
+                    onInfoClick = onInfoClick
+                )
+            }
         }
     ) { padding ->
 
@@ -212,31 +231,69 @@ fun PatientHistoryScreen(
                 }
 
                 else -> {
-
+                    if (!isSelecting) {
+                        Text(
+                            "Mantén presionada una evaluación\npara seleccionarla y exportar PDF",
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    }
                     LazyColumn(
-                        modifier =
-                            Modifier.fillMaxSize()
-                                .padding(
-                                    horizontal = 16.dp
-                                ),
-
-                        verticalArrangement =
-                            Arrangement.spacedBy(10.dp)
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-
                         items(evaluaciones) { item ->
-
-                            EvaluationCard(item)
-                        }
-
-                        item {
-                            Spacer(
-                                modifier =
-                                    Modifier.height(20.dp)
+                            val isSelected = item.id in selectedIds
+                            SelectableEvaluationCard(
+                                item = item,
+                                isSelected = isSelected,
+                                isSelecting = isSelecting,
+                                onLongClick = { selectedIds = selectedIds + item.id },
+                                onToggle = {
+                                    selectedIds = if (isSelected) selectedIds - item.id else selectedIds + item.id
+                                }
                             )
                         }
+                        item { Spacer(modifier = Modifier.height(20.dp)) }
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun SelectableEvaluationCard(
+    item: Evaluacion,
+    isSelected: Boolean,
+    isSelecting: Boolean,
+    onLongClick: () -> Unit,
+    onToggle: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(if (isSelected) 2.dp else 0.dp, if (isSelected) DarkBlue else Color.Transparent, RoundedCornerShape(12.dp))
+            .combinedClickable(
+                onClick = { if (isSelecting) onToggle() },
+                onLongClick = { if (!isSelecting) onLongClick() }
+            )
+    ) {
+        EvaluationCard(item)
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(DarkBlue),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Outlined.CheckCircle, null, tint = Color.White, modifier = Modifier.size(18.dp))
             }
         }
     }

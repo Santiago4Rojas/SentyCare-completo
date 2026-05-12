@@ -8,6 +8,8 @@ data class Usuario(
     val rol: String = "",
     val especialidad: String = "",
     val nivel: String = "",
+    val noDoc: String = "",
+    val rh: String = "",
     val activo: Boolean = true,
     val creadoEn: Long = 0L
 )

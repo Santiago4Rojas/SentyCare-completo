@@ -112,6 +112,27 @@ fun DolorScreen(
     var iaCargando by remember { mutableStateOf(false) }
     var guardado by remember { mutableStateOf(false) }
     var guardando by remember { mutableStateOf(false) }
+    var showBackConfirm by remember { mutableStateOf(false) }
+
+    if (showBackConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBackConfirm = false },
+            containerColor = Color.White,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            title = { Text("¿Salir sin guardar?", fontWeight = FontWeight.Bold, color = DarkBlue) },
+            text = { Text("La evaluación no ha sido guardada. Si sale ahora, se perderán los datos.", fontSize = 14.sp) },
+            confirmButton = {
+                Button(
+                    onClick = { showBackConfirm = false; onBackClick() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                ) { Text("Salir", color = Color.White) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showBackConfirm = false }, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) { Text("Quedarme") }
+            }
+        )
+    }
 
     fun guardarEvaluacion(nombreEscala: String, puntaje: Int, clasificacion: String, recommendations: List<String>, onSuccess: () -> Unit) {
         if (guardado || guardando) return
@@ -163,9 +184,10 @@ fun DolorScreen(
             }
     }
 
-    BackHandler {                          // ← AQUÍ
+    BackHandler {
         when {
-            showResult -> showResult = false
+            showResult && !guardado -> showBackConfirm = true
+            showResult && guardado -> onBackClick()
             escala == DolorEscala.FLACC && step > 0 -> step--
             escala != null -> { escala = null; step = 0 }
             else -> onBackClick()
@@ -187,7 +209,8 @@ fun DolorScreen(
                 navigationIcon = {
                     IconButton(onClick = {
                         when {
-                            showResult -> showResult = false
+                            showResult && !guardado -> showBackConfirm = true
+                            showResult && guardado -> onBackClick()
                             escala == DolorEscala.FLACC && step > 0 -> step--
                             escala != null -> { escala = null; step = 0 }
                             else -> onBackClick()
@@ -225,6 +248,7 @@ fun DolorScreen(
                         rangeLabels = listOf("0 Sin dolor", "1-3 Leve", "4-6 Moderado", "7-10 Severo"),
                         rangeColors = listOf(Color(0xFF4CAF50), Color(0xFF8BC34A), Color(0xFFFFC107), Color(0xFFF44336)),
                         activeRange = when (total) { 0 -> 0; in 1..3 -> 1; in 4..6 -> 2; else -> 3 },
+                        pacienteNombre = "${patient.nombre} ${patient.apellido}",
                         recomendacionMedico = recomendacionMedico,
                         onRecomendacionMedicoChange = { recomendacionMedico = it },
                         iaRecomendacion = iaRecomendacion,
@@ -249,6 +273,7 @@ fun DolorScreen(
                         rangeLabels = listOf("0", "2", "4", "6", "8", "10"),
                         rangeColors = listOf(Color(0xFF4CAF50), Color(0xFF8BC34A), Color(0xFFFFEB3B), Color(0xFFFFC107), Color(0xFFFF7043), Color(0xFFF44336)),
                         activeRange = FACES_OPTIONS.indexOfFirst { it.score == s },
+                        pacienteNombre = "${patient.nombre} ${patient.apellido}",
                         recomendacionMedico = recomendacionMedico,
                         onRecomendacionMedicoChange = { recomendacionMedico = it },
                         iaRecomendacion = iaRecomendacion,
@@ -516,6 +541,7 @@ fun DolorResultStep(
     scoreDisplay: String, maxScore: Int, numericScore: Int,
     result: DolorResult, escalaLabel: String,
     rangeLabels: List<String>, rangeColors: List<Color>, activeRange: Int,
+    pacienteNombre: String = "",
     recomendacionMedico: String = "",
     onRecomendacionMedicoChange: (String) -> Unit = {},
     iaRecomendacion: String = "",
@@ -638,6 +664,14 @@ fun DolorResultStep(
                     Text("Guardar evaluación", color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        if (guardado) {
+            ReminderButton(
+                paciente = pacienteNombre,
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(modifier = Modifier.height(10.dp))
         }
 
