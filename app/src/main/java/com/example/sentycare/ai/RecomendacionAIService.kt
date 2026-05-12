@@ -1,5 +1,6 @@
 package com.example.sentycare.ai
 
+import android.util.Log
 import com.example.sentycare.BuildConfig
 import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.coroutines.Dispatchers
@@ -18,14 +19,16 @@ data class ContextoEvaluacion(
 object RecomendacionAIService {
 
     private const val MODELO = "gemini-1.5-flash"
+    private const val TAG    = "RecomendacionAI"
 
     private val model by lazy {
-        GenerativeModel(
-            modelName = MODELO,
-            apiKey    = BuildConfig.GEMINI_API_KEY
-        )
+        check(BuildConfig.GEMINI_API_KEY.isNotBlank()) {
+            "GEMINI_API_KEY no configurada — agrega GEMINI_API_KEY en local.properties"
+        }
+        GenerativeModel(modelName = MODELO, apiKey = BuildConfig.GEMINI_API_KEY)
     }
 
+    // Returns the recommendation text, or throws an exception with a descriptive message.
     suspend fun generarRecomendacion(ctx: ContextoEvaluacion): String = withContext(Dispatchers.IO) {
         val historialTexto = if (ctx.historialReciente.isEmpty()) {
             "Sin historial previo."
@@ -72,11 +75,9 @@ Basado en los protocolos de sedoanalgesia pediátrica (SCCM 2022, PICU guideline
 - Responde únicamente los 3 puntos numerados (1. 2. 3.), sin encabezados adicionales.
         """.trimIndent()
 
-        return@withContext try {
-            val response = model.generateContent(prompt)
-            response.text?.trim() ?: ""
-        } catch (e: Exception) {
-            ""
-        }
+        val response = model.generateContent(prompt)
+        val texto = response.text?.trim().orEmpty()
+        Log.d(TAG, "Respuesta IA (${texto.length} chars)")
+        texto
     }
 }

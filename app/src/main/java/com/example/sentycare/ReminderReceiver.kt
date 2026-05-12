@@ -2,6 +2,7 @@ package com.example.sentycare
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -24,6 +25,13 @@ class ReminderReceiver : BroadcastReceiver() {
             nm.createNotificationChannel(channel)
         }
 
+        // Tap opens the app, preserving the existing back stack (session included)
+        val openIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        val contentPendingIntent = PendingIntent.getActivity(context, 0, openIntent, pendingFlags)
+
         val titulo = if (paciente.isNotBlank()) "Recordatorio — $paciente" else "Recordatorio UCI"
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
@@ -32,6 +40,7 @@ class ReminderReceiver : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(mensaje))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
+            .setContentIntent(contentPendingIntent)
             .build()
 
         nm.notify(System.currentTimeMillis().toInt(), notification)
@@ -41,3 +50,4 @@ class ReminderReceiver : BroadcastReceiver() {
         const val CHANNEL_ID = "recordatorio_evaluacion"
     }
 }
+

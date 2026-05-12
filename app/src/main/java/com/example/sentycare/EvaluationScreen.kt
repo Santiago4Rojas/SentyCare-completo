@@ -60,7 +60,7 @@ fun EvaluationScreen(
 
         AlertDialog(
             onDismissRequest = { showCamaDialog = false; newCamaValue = ""; camaOcupadaError = "" },
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.White,
             shape = RoundedCornerShape(16.dp),
             title = null,
             text = {
@@ -69,28 +69,32 @@ fun EvaluationScreen(
                         "Modificar cama",
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = DarkBlue
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
                         "Nueva cama para ${currentPatient.nombre}",
                         fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = DarkBlueVariant
                     )
                     Spacer(Modifier.height(16.dp))
                     OutlinedTextField(
                         value         = newCamaValue,
-                        onValueChange = { if (it.length <= 2) { newCamaValue = it; camaOcupadaError = "" } },
+                        onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) { newCamaValue = it; camaOcupadaError = "" } },
                         label         = { Text("Número de cama") },
                         singleLine    = true,
                         isError       = camaOcupadaError.isNotEmpty(),
                         supportingText = {
                             if (camaOcupadaError.isNotEmpty())
-                                Text(camaOcupadaError, color = MaterialTheme.colorScheme.error)
+                                Text(camaOcupadaError, color = Color(0xFFA32D2D))
                         },
                         shape           = RoundedCornerShape(8.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier        = Modifier.fillMaxWidth()
+                        modifier        = Modifier.fillMaxWidth(),
+                        colors          = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor   = DarkBlue,
+                            unfocusedBorderColor = LightGray
+                        )
                     )
                     Spacer(Modifier.height(20.dp))
                     Row(
@@ -101,7 +105,7 @@ fun EvaluationScreen(
                             onClick  = { showCamaDialog = false; newCamaValue = ""; camaOcupadaError = "" },
                             modifier = Modifier.weight(1f),
                             shape    = RoundedCornerShape(8.dp)
-                        ) { Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        ) { Text("Cancelar", color = LightGray) }
 
                         Button(
                             onClick = {
@@ -162,7 +166,7 @@ fun EvaluationScreen(
     if (showAltaDialog) {
         AlertDialog(
             onDismissRequest = { showAltaDialog = false },
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.White,
             shape = RoundedCornerShape(16.dp),
             title = null,
             text = {
@@ -186,28 +190,28 @@ fun EvaluationScreen(
                         "Dar de alta",
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = DarkBlue
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         buildAnnotatedString {
                             withStyle(SpanStyle(
                                 fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = DarkBlue
                             )) {
                                 append("${currentPatient.nombre} ${currentPatient.apellido}")
                             }
                             append(" será retirado de la lista de pacientes activos.")
                         },
                         fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = DarkBlueVariant,
                         lineHeight = 22.sp
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
                         "Esta acción no se puede deshacer.",
                         fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = DarkBlueVariant,
                         lineHeight = 20.sp
                     )
                     Spacer(Modifier.height(24.dp))
@@ -219,7 +223,7 @@ fun EvaluationScreen(
                             onClick = { showAltaDialog = false },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
-                        ) { Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        ) { Text("Cancelar", color = LightGray) }
                         Button(
                             onClick = {
                                 db.collection("pacientes").document(currentPatient.id)
