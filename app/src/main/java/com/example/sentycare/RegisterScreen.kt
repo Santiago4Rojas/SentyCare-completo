@@ -415,7 +415,7 @@ fun RegisterScreen(
                     colors = CardDefaults.cardColors(containerColor = DarkBlue.copy(alpha = 0.07f))
                 ) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Info, null, tint = DarkBlue, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Info, null, tint = DarkBlue, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(10.dp))
                         Text(
                             "Paciente encontrado como inactivo. Datos cargados automáticamente. " +
