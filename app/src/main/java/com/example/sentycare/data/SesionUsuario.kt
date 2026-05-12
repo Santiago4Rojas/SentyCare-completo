@@ -8,7 +8,8 @@ data class SesionUsuario(
     val rol: Rol = Rol.ENFERMERA,
     val especialidad: String = "",
     val noDoc: String = "",
-    val rh: String = ""
+    val rh: String = "",
+    val fotoUrl: String = ""
 ) {
     val nombreCompleto: String get() = "$nombre $apellido".trim()
 }

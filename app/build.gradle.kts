@@ -70,4 +70,7 @@ dependencies {
 
     // Coroutines para llamadas asíncronas a la IA
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Coil para carga de imágenes (foto de perfil)
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }

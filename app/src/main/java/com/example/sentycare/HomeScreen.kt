@@ -2,8 +2,12 @@ package com.example.sentycare
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import coil.compose.AsyncImage
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -46,6 +50,7 @@ import com.example.sentycare.ui.theme.*
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -86,6 +91,27 @@ fun HomeScreen(
     var newCamaValue by remember { mutableStateOf("") }
     var sortBy by remember { mutableStateOf(SortBy.FECHA) }
     var showChangePassword by remember { mutableStateOf(false) }
+    var fotoUrl by remember { mutableStateOf(SesionState.usuario.fotoUrl) }
+    var uploadingPhoto by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        uploadingPhoto = true
+        val uid = auth.currentUser?.uid ?: return@rememberLauncherForActivityResult
+        val ref = FirebaseStorage.getInstance().reference.child("profilePhotos/$uid.jpg")
+        ref.putFile(uri).addOnSuccessListener {
+            ref.downloadUrl.addOnSuccessListener { downloadUri ->
+                val url = downloadUri.toString()
+                fotoUrl = url
+                SesionState.usuario = SesionState.usuario.copy(fotoUrl = url)
+                db.collection("usuarios").document(uid).update("fotoUrl", url)
+                uploadingPhoto = false
+            }
+        }.addOnFailureListener {
+            uploadingPhoto = false
+            Toast.makeText(context, "Error al subir foto", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     LaunchedEffect(Unit) {
         db.collection("pacientes").get().addOnSuccessListener { result ->
@@ -100,7 +126,7 @@ fun HomeScreen(
             SortBy.FECHA -> patients.sortedByDescending { it.registradoEn }
             SortBy.NOMBRE -> patients.sortedBy { "${it.nombre} ${it.apellido}" }
             SortBy.CAMA -> patients.sortedBy { it.numeroCama.padStart(3, '0') }
-            SortBy.DIAGNOSTICO -> patients.sortedBy { it.diagnostico }
+            SortBy.DIAGNOSTICO -> patients.sortedBy { it.diagnostico.lowercase() }
             SortBy.RH -> patients.sortedBy { it.rh }
         }
     }
@@ -213,51 +239,82 @@ fun HomeScreen(
                 drawerContainerColor = Color.White,
                 modifier = Modifier.width(300.dp)
             ) {
-                // Header with role-colored icon
+                // Header — white background with blue left accent bar
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(DarkBlue)
-                        .padding(24.dp)
+                        .background(Color.White)
+                        .border(
+                            width = 1.dp,
+                            color = DarkBlue.copy(alpha = 0.15f),
+                            shape = androidx.compose.foundation.shape.RectangleShape
+                        )
+                        .padding(start = 20.dp, top = 24.dp, end = 20.dp, bottom = 20.dp)
                 ) {
-                    Column {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(rolColor(SesionState.rol)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Outlined.Person,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(40.dp)
-                            )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Avatar with photo or initials + edit button
+                        Box(contentAlignment = Alignment.BottomEnd) {
+                            Box(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(CircleShape)
+                                    .background(DarkBlue)
+                                    .border(2.dp, DarkBlue, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (fotoUrl.isNotBlank()) {
+                                    AsyncImage(
+                                        model = fotoUrl,
+                                        contentDescription = "Foto de perfil",
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                    )
+                                } else {
+                                    val initials = buildString {
+                                        SesionState.usuario.nombre.firstOrNull()?.let { append(it.uppercaseChar()) }
+                                        SesionState.usuario.apellido.firstOrNull()?.let { append(it.uppercaseChar()) }
+                                    }.ifBlank { "?" }
+                                    Text(initials, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            // Edit/camera button
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                                    .border(1.5.dp, DarkBlue, CircleShape)
+                                    .clickable { photoPickerLauncher.launch("image/*") },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (uploadingPhoto) {
+                                    CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp, color = DarkBlue)
+                                } else {
+                                    Icon(Icons.Outlined.CameraAlt, null, tint = DarkBlue, modifier = Modifier.size(12.dp))
+                                }
+                            }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Bienvenido",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 11.sp
-                        )
-                        Text(
-                            SesionState.usuario.nombreCompleto.ifBlank { "Usuario" },
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            SesionState.usuario.rol.displayName,
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontSize = 12.sp
-                        )
-                        if (SesionState.usuario.especialidad.isNotBlank()) {
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                SesionState.usuario.especialidad,
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 11.sp
+                                SesionState.usuario.nombreCompleto.ifBlank { "Usuario" },
+                                color = DarkBlue,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 20.sp
                             )
+                            Text(
+                                SesionState.usuario.rol.displayName,
+                                color = DarkBlue.copy(alpha = 0.7f),
+                                fontSize = 12.sp
+                            )
+                            if (SesionState.usuario.especialidad.isNotBlank()) {
+                                Text(
+                                    SesionState.usuario.especialidad,
+                                    color = Color.Gray,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
                 }

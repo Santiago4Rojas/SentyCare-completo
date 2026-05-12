@@ -75,8 +75,21 @@ fun RegisterScreen(
     var showAddCamaTempDialog by remember { mutableStateOf(false) }
     var nuevaCamaTemp  by remember { mutableStateOf("") }
 
-    val camasDisponibles = remember(camasTemporales) {
-        (1..10).map { it.toString() } + camasTemporales
+    val camasDisponibles = remember(camasTemporales, camasOcupadas, noDoc) {
+        val todas = (1..10).map { it.toString() } + camasTemporales
+        todas.filter { cama -> cama !in camasOcupadas }
+    }
+
+    LaunchedEffect(Unit) {
+        db.collection("pacientes")
+            .whereEqualTo("activo", true)
+            .get()
+            .addOnSuccessListener { result ->
+                camasOcupadas = result.documents
+                    .mapNotNull { it.getString("numeroCama") }
+                    .filter { it.isNotBlank() }
+                    .toSet()
+            }
     }
 
     var lookupState  by remember { mutableStateOf(LookupState.IDLE) }
@@ -86,6 +99,9 @@ fun RegisterScreen(
     var showCamaDialog   by remember { mutableStateOf(false) }
     var camaOcupadaPor   by remember { mutableStateOf("") }
     var isRegistering    by remember { mutableStateOf(false) }
+    var camasOcupadas    by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var checkingCamaTemp by remember { mutableStateOf(false) }
+    var camasTempError   by remember { mutableStateOf("") }
 
     // Solo campos de identidad son readonly en INACTIVE
     val isReadOnly = lookupState == LookupState.INACTIVE
@@ -152,39 +168,64 @@ fun RegisterScreen(
 
     if (showAddCamaTempDialog) {
         AlertDialog(
-            onDismissRequest = { showAddCamaTempDialog = false; nuevaCamaTemp = "" },
+            onDismissRequest = { showAddCamaTempDialog = false; nuevaCamaTemp = ""; camasTempError = "" },
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(16.dp),
             title = { Text("Agregar cama temporal", fontWeight = FontWeight.Medium) },
             text = {
-                OutlinedTextField(
-                    value = nuevaCamaTemp,
-                    onValueChange = { if (it.length <= 5) nuevaCamaTemp = it },
-                    label = { Text("Número o código de cama") },
-                    placeholder = { Text("Ej: T1, 11, UCI-3") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = nuevaCamaTemp,
+                        onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) { nuevaCamaTemp = it; camasTempError = "" } },
+                        label = { Text("Número de cama temporal") },
+                        placeholder = { Text("Ej: 11, 12") },
+                        singleLine = true,
+                        isError = camasTempError.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    if (camasTempError.isNotEmpty()) {
+                        Text(camasTempError, fontSize = 12.sp, color = Color(0xFFA32D2D))
+                    }
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         val cama = nuevaCamaTemp.trim()
-                        if (cama.isNotBlank()) {
-                            camasTemporales = camasTemporales + cama
-                            numeroCama = cama
-                        }
-                        showAddCamaTempDialog = false
-                        nuevaCamaTemp = ""
+                        if (cama.isBlank()) return@Button
+                        checkingCamaTemp = true
+                        db.collection("pacientes")
+                            .whereEqualTo("numeroCama", cama)
+                            .whereEqualTo("activo", true)
+                            .get()
+                            .addOnSuccessListener { result ->
+                                checkingCamaTemp = false
+                                val ocupante = result.documents.firstOrNull { it.getString("noDoc") != noDoc }
+                                if (ocupante != null) {
+                                    val n = "${ocupante.getString("nombre") ?: ""} ${ocupante.getString("apellido") ?: ""}".trim()
+                                    camasTempError = "Ocupada por ${n.ifBlank { "otro paciente" }}"
+                                } else {
+                                    camasTemporales = camasTemporales + cama
+                                    numeroCama = cama
+                                    showAddCamaTempDialog = false
+                                    nuevaCamaTemp = ""
+                                    camasTempError = ""
+                                }
+                            }
+                            .addOnFailureListener { checkingCamaTemp = false; camasTempError = "Error al verificar" }
                     },
-                    enabled = nuevaCamaTemp.isNotBlank(),
+                    enabled = nuevaCamaTemp.isNotBlank() && !checkingCamaTemp,
                     colors = ButtonDefaults.buttonColors(containerColor = DarkBlue),
                     shape = RoundedCornerShape(8.dp)
-                ) { Text("Agregar") }
+                ) {
+                    if (checkingCamaTemp) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                    else Text("Agregar")
+                }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showAddCamaTempDialog = false; nuevaCamaTemp = "" }, shape = RoundedCornerShape(8.dp)) { Text("Cancelar") }
+                OutlinedButton(onClick = { showAddCamaTempDialog = false; nuevaCamaTemp = ""; camasTempError = "" }, shape = RoundedCornerShape(8.dp)) { Text("Cancelar") }
             }
         )
     }
@@ -389,12 +430,12 @@ fun RegisterScreen(
 
             // ── Nombre ────────────────────────────────────────────────────
             if (isReadOnly) ReadOnlyField("Nombre", foundPatient?.nombre ?: "")
-            else            FormField("Nombre *", nombre, { nombre = it }, "Ej: Juan")
+            else            FormField("Nombre *", nombre, { v -> if (v.all { it.isLetter() || it == ' ' }) nombre = v }, "Ej: Juan")
             Spacer(Modifier.height(14.dp))
 
             // ── Apellido ──────────────────────────────────────────────────
             if (isReadOnly) ReadOnlyField("Apellido", foundPatient?.apellido ?: "")
-            else            FormField("Apellido *", apellido, { apellido = it }, "Ej: Pérez")
+            else            FormField("Apellido *", apellido, { v -> if (v.all { it.isLetter() || it == ' ' }) apellido = v }, "Ej: Pérez")
             Spacer(Modifier.height(14.dp))
 
             // ── Género ────────────────────────────────────────────────────

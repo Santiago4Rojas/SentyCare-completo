@@ -2,9 +2,14 @@ package com.example.sentycare
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
@@ -64,16 +69,34 @@ object PdfExportHelper {
 
     private val sdfDate = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
 
+    private fun drawWatermark(canvas: Canvas, logoBitmap: Bitmap?) {
+        logoBitmap ?: return
+        val size = 200f
+        val left = (PAGE_WIDTH - size) / 2f
+        val top = (PAGE_HEIGHT - size) / 2f
+        val paintWm = Paint().apply {
+            alpha = 20
+            isAntiAlias = true
+        }
+        val dst = android.graphics.RectF(left, top, left + size, top + size)
+        canvas.drawBitmap(logoBitmap, null, dst, paintWm)
+    }
+
     fun generarYCompartirPdf(
         context: Context,
         patient: Patient,
         evaluaciones: List<Evaluacion>
     ) {
+        val logoBitmap = try {
+            BitmapFactory.decodeResource(context.resources, R.drawable.logosentycare)
+        } catch (e: Exception) { null }
+
         val doc = PdfDocument()
         var pageNum = 1
         var page = newPage(doc, pageNum)
         var canvas = page.canvas
         var y = MARGIN
+        drawWatermark(canvas, logoBitmap)
 
         y = drawHeader(canvas, y)
         y += SECTION_SPACING
@@ -83,6 +106,7 @@ object PdfExportHelper {
         if (patient.acudienteNombre.isNotBlank()) {
             if (y + 80 > PAGE_HEIGHT - MARGIN) {
                 doc.finishPage(page); pageNum++; page = newPage(doc, pageNum); canvas = page.canvas; y = MARGIN
+                drawWatermark(canvas, logoBitmap)
             }
             y = drawConsentInfo(canvas, y, patient)
             y += SECTION_SPACING
@@ -91,6 +115,7 @@ object PdfExportHelper {
         // Scale reference summary
         if (y + 100 > PAGE_HEIGHT - MARGIN) {
             doc.finishPage(page); pageNum++; page = newPage(doc, pageNum); canvas = page.canvas; y = MARGIN
+            drawWatermark(canvas, logoBitmap)
         }
         y = drawScaleReference(canvas, y, evaluaciones)
 
@@ -102,6 +127,7 @@ object PdfExportHelper {
             page = newPage(doc, pageNum)
             canvas = page.canvas
             y = MARGIN
+            drawWatermark(canvas, logoBitmap)
             drawEvaluacion(canvas, y, idx + 1, ev, patient)
             doc.finishPage(page)
         }
