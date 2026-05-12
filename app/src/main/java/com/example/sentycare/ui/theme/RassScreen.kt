@@ -24,6 +24,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import kotlinx.coroutines.launch
+import com.example.sentycare.SesionState
+import com.example.sentycare.ai.ContextoEvaluacion
+import com.example.sentycare.ai.RecomendacionAIService
+import com.example.sentycare.permissions.Permisos
 import com.example.sentycare.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -98,8 +105,65 @@ fun RassScreen(
     var showResult by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var recomendacionMedico by remember { mutableStateOf("") }
+    var iaRecomendacion by remember { mutableStateOf("") }
+    var iaCargando by remember { mutableStateOf(false) }
+    var guardado by remember { mutableStateOf(false) }
+    var guardando by remember { mutableStateOf(false) }
 
-    BackHandler {                          // ← AQUÍ
+    fun guardarEvaluacion(score: Int, onSuccess: () -> Unit) {
+        if (guardado || guardando) return
+        guardando = true
+        val result = interpretRass(score)
+        val data = hashMapOf(
+            "pacienteNombre"             to "${patient.nombre} ${patient.apellido}",
+            "pacienteDocumento"          to patient.noDoc,
+            "escala"                     to "RASS",
+            "puntaje"                    to score,
+            "clasificacion"              to result.label,
+            "fecha"                      to System.currentTimeMillis(),
+            "evaluadorId"                to SesionState.usuario.uid,
+            "evaluadorNombre"            to SesionState.usuario.nombreCompleto,
+            "evaluadorEspecialidad"      to SesionState.usuario.especialidad,
+            "evaluadorNivel"             to SesionState.usuario.nivel,
+            "recomendacionesAutomaticas" to rassRecomendaciones(score),
+            "recomendacionMedico"        to recomendacionMedico,
+            "recomendacionIA"            to "",
+            "recomendacionIAGeneradaEn"  to 0L
+        )
+        db.collection("evaluaciones").add(data)
+            .addOnSuccessListener { docRef ->
+                guardado  = true
+                guardando = false
+                Toast.makeText(context, "Evaluación guardada", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    iaCargando = true
+                    val iaTexto = RecomendacionAIService.generarRecomendacion(
+                        ContextoEvaluacion(
+                            escala          = "RASS",
+                            puntaje         = score,
+                            clasificacion   = result.label,
+                            nombrePaciente  = "${patient.nombre} ${patient.apellido}",
+                            diagnostico     = patient.diagnostico,
+                            fechaNacimiento = patient.fechaNacimiento
+                        )
+                    )
+                    iaCargando = false
+                    if (iaTexto.isNotBlank()) {
+                        iaRecomendacion = iaTexto
+                        docRef.update("recomendacionIA", iaTexto, "recomendacionIAGeneradaEn", System.currentTimeMillis())
+                    }
+                }
+                onSuccess()
+            }
+            .addOnFailureListener { e ->
+                guardando = false
+                Toast.makeText(context, "Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    BackHandler {
         if (showResult) showResult = false else onBackClick()
     }
 
@@ -125,22 +189,23 @@ fun RassScreen(
             )
         } else {
             selectedScore?.let { score ->
-                LaunchedEffect(Unit) {
-                    val result = interpretRass(score)
-                    val data = hashMapOf(
-                        "pacienteNombre"    to "${patient.nombre} ${patient.apellido}",
-                        "pacienteDocumento" to patient.noDoc,
-                        "escala"            to "RASS",
-                        "puntaje"           to score,
-                        "clasificacion"     to result.label,
-                        "fecha"             to System.currentTimeMillis()
-                    )
-                    db.collection("evaluaciones").add(data)
-                    Toast.makeText(context, "Evaluación guardada", Toast.LENGTH_SHORT).show()
-                }
                 RassResultStep(
                     score = score,
-                    onNewEvaluation = { selectedScore = null; showResult = false; onNewEvaluation() },
+                    recomendacionMedico = recomendacionMedico,
+                    onRecomendacionMedicoChange = { recomendacionMedico = it },
+                    iaRecomendacion = iaRecomendacion,
+                    iaCargando = iaCargando,
+                    guardado = guardado,
+                    guardando = guardando,
+                    onGuardar = { guardarEvaluacion(score) {} },
+                    onNewEvaluation = {
+                        selectedScore = null
+                        showResult = false
+                        recomendacionMedico = ""
+                        iaRecomendacion = ""
+                        guardado = false
+                        onNewEvaluation()
+                    },
                     onHome = onHomeClick,
                     modifier = Modifier.padding(padding)
                 )
@@ -227,7 +292,19 @@ fun RassSelectionStep(
 }
 
 @Composable
-fun RassResultStep(score: Int, onNewEvaluation: () -> Unit, onHome: () -> Unit, modifier: Modifier = Modifier) {
+fun RassResultStep(
+    score: Int,
+    recomendacionMedico: String = "",
+    onRecomendacionMedicoChange: (String) -> Unit = {},
+    iaRecomendacion: String = "",
+    iaCargando: Boolean = false,
+    guardado: Boolean = false,
+    guardando: Boolean = false,
+    onGuardar: () -> Unit = {},
+    onNewEvaluation: () -> Unit,
+    onHome: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val result = interpretRass(score)
     Column(
         modifier = modifier.fillMaxSize().background(Color(0xFFF0F4F8)).verticalScroll(rememberScrollState()).padding(20.dp),
@@ -246,9 +323,11 @@ fun RassResultStep(score: Int, onNewEvaluation: () -> Unit, onHome: () -> Unit, 
             Text(result.label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
         Spacer(modifier = Modifier.height(24.dp))
+
+        // Recomendaciones automáticas
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(3.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Recomendación", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkBlue)
+                Text("Recomendación clínica", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkBlue)
                 Spacer(modifier = Modifier.height(12.dp))
                 rassRecomendaciones(score).forEach { rec ->
                     Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
@@ -259,6 +338,56 @@ fun RassResultStep(score: Int, onNewEvaluation: () -> Unit, onHome: () -> Unit, 
                 }
             }
         }
+
+        // Campo abierto de recomendación médica
+        if (Permisos.puedeAgregarRecomendacionMedico(SesionState.rol)) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(3.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Recomendación del médico", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkBlue)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = recomendacionMedico,
+                        onValueChange = onRecomendacionMedicoChange,
+                        placeholder = { Text("Escriba su recomendación clínica adicional...", fontSize = 13.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 6,
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = !guardado,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = DarkBlue,
+                            unfocusedBorderColor = Color(0xFFCCCCCC)
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default)
+                    )
+                }
+            }
+        }
+
+        // Recomendación IA
+        Spacer(modifier = Modifier.height(16.dp))
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F0FF)), elevation = CardDefaults.cardElevation(3.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("✨", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Recomendación IA", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6200EE))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                when {
+                    iaCargando -> {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Color(0xFF6200EE))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Generando recomendación basada en protocolos PICU...", fontSize = 12.sp, color = Color.Gray)
+                    }
+                    iaRecomendacion.isNotBlank() -> Text(iaRecomendacion, fontSize = 14.sp, color = Color.DarkGray, lineHeight = 22.sp)
+                    guardado -> Text("Sin respuesta de la IA en este momento.", fontSize = 13.sp, color = Color.Gray)
+                    else -> Text("Se generará al guardar la evaluación.", fontSize = 13.sp, color = Color.Gray)
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
         Text("Referencia de rangos:", fontSize = 13.sp, color = Color.Gray, modifier = Modifier.align(Alignment.Start))
         Spacer(modifier = Modifier.height(10.dp))
@@ -278,6 +407,24 @@ fun RassResultStep(score: Int, onNewEvaluation: () -> Unit, onHome: () -> Unit, 
             }
         }
         Spacer(modifier = Modifier.height(28.dp))
+
+        if (!guardado) {
+            Button(
+                onClick = onGuardar,
+                enabled = !guardando,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = DarkBlue)
+            ) {
+                if (guardando) {
+                    CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("Guardar evaluación", color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = onNewEvaluation, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, DarkBlue)) {
                 Text("Nueva evaluación", color = DarkBlue)

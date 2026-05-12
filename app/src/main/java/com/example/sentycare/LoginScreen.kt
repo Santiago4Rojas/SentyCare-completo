@@ -37,13 +37,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import com.example.sentycare.R
 import androidx.activity.compose.BackHandler
 import com.example.sentycare.ui.theme.*
+import com.example.sentycare.data.Rol
+import com.example.sentycare.data.SesionUsuario
+import com.example.sentycare.SesionState
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun LoginScreen(
     onNavigateToRecovery: () -> Unit,
-    onLoginClick: (String) -> Unit = {}
+    onLoginClick: () -> Unit = {}
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -134,11 +137,20 @@ fun LoginScreen(
                                 .document(uid)
                                 .get()
                                 .addOnSuccessListener { doc ->
-                                    val nombre = doc.getString("nombre") ?: "Doctor"
-                                    onLoginClick(nombre)
+                                    SesionState.usuario = SesionUsuario(
+                                        uid          = uid,
+                                        nombre       = doc.getString("nombre") ?: "Usuario",
+                                        apellido     = doc.getString("apellido") ?: "",
+                                        email        = email,
+                                        rol          = Rol.fromString(doc.getString("rol") ?: ""),
+                                        especialidad = doc.getString("especialidad") ?: "",
+                                        nivel        = doc.getString("nivel") ?: ""
+                                    )
+                                    onLoginClick()
                                 }
                                 .addOnFailureListener {
-                                    onLoginClick("Doctor")
+                                    SesionState.usuario = SesionUsuario(uid = uid, nombre = "Usuario")
+                                    onLoginClick()
                                 }
                         } else {
                             Toast.makeText(

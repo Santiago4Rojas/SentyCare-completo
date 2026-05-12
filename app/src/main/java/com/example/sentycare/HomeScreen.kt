@@ -38,14 +38,15 @@ import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
 import com.example.sentycare.ui.theme.*
+import com.example.sentycare.permissions.Permisos
 import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun HomeScreen(
-    doctorName: String = "Doctor",
     onRegisterClick: () -> Unit = {},
     onPatientClick: (Patient) -> Unit = {},
-    onLogoutClick: () -> Unit = {}
+    onLogoutClick: () -> Unit = {},
+    onAdminClick: () -> Unit = {}
 ) {
     BackHandler {}
     val focusManager = LocalFocusManager.current
@@ -191,7 +192,16 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "Bienvenido", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
-                    Text(text = doctorName, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = SesionState.usuario.nombreCompleto.ifBlank { "Usuario" },
+                        color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold
+                    )
+                    if (SesionState.usuario.especialidad.isNotBlank()) {
+                        Text(
+                            text = "${SesionState.usuario.especialidad} · ${SesionState.usuario.nivel}".trimEnd(' ', '·', ' '),
+                            color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp
+                        )
+                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -247,22 +257,24 @@ fun HomeScreen(
             }
         }
 
-        ExtendedFloatingActionButton(
-            onClick = onRegisterClick,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(bottom = 20.dp),
-            containerColor = DarkBlue,
-            contentColor = Color.White,
-            shape = RoundedCornerShape(14.dp),
-            icon = {
-                Icon(imageVector = Icons.Outlined.PersonAdd, contentDescription = null)
-            },
-            text = {
-                Text("Registrar paciente", fontWeight = FontWeight.SemiBold)
-            }
-        )
+        if (Permisos.puedeRegistrarPaciente(SesionState.rol)) {
+            ExtendedFloatingActionButton(
+                onClick = onRegisterClick,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 20.dp),
+                containerColor = DarkBlue,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(14.dp),
+                icon = {
+                    Icon(imageVector = Icons.Outlined.PersonAdd, contentDescription = null)
+                },
+                text = {
+                    Text("Registrar paciente", fontWeight = FontWeight.SemiBold)
+                }
+            )
+        }
     }
 }
 
@@ -359,16 +371,18 @@ fun ExpandablePatientCard(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Cama", fontSize = 12.sp, color = DarkBlue, fontWeight = FontWeight.SemiBold)
                         }
-                        OutlinedButton(
-                            onClick = onDischarge,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE53935)),
-                            contentPadding = PaddingValues(vertical = 10.dp)
-                        ) {
-                            Icon(imageVector = Icons.Outlined.ExitToApp, contentDescription = null, tint = Color(0xFFE53935), modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Alta", fontSize = 12.sp, color = Color(0xFFE53935), fontWeight = FontWeight.SemiBold)
+                        if (Permisos.puedeDarDeAlta(SesionState.rol)) {
+                            OutlinedButton(
+                                onClick = onDischarge,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE53935)),
+                                contentPadding = PaddingValues(vertical = 10.dp)
+                            ) {
+                                Icon(imageVector = Icons.Outlined.ExitToApp, contentDescription = null, tint = Color(0xFFE53935), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Alta", fontSize = 12.sp, color = Color(0xFFE53935), fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }

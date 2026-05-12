@@ -16,5 +16,11 @@ data class Patient(
     val acudienteNombre: String = "",
     val acudienteCedula: String = "",
     val acudienteTelefono: String = "",
-    val acudienteParentesco: String = ""
+    val acudienteParentesco: String = "",
+
+    val registradoPorId: String = "",
+    val registradoPorNombre: String = "",
+    val registradoPorEspecialidad: String = "",
+    val registradoPorNivel: String = "",
+    val registradoEn: Long = 0L
 )

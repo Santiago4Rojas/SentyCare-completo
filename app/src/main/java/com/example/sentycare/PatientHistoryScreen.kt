@@ -28,7 +28,13 @@ data class Evaluacion(
     val escala: String = "",
     val puntaje: Any? = "",
     val clasificacion: String = "",
-    val fecha: Long = 0L
+    val fecha: Long = 0L,
+    val evaluadorId: String = "",
+    val evaluadorNombre: String = "",
+    val evaluadorEspecialidad: String = "",
+    val evaluadorNivel: String = "",
+    val recomendacionMedico: String = "",
+    val recomendacionIA: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -322,10 +328,39 @@ fun EvaluationCard(
             Text(
                 item.clasificacion,
                 fontSize = 14.sp,
-                fontWeight =
-                    FontWeight.Medium,
+                fontWeight = FontWeight.Medium,
                 color = Color.Gray
             )
+
+            if (item.evaluadorNombre.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                val evaluadorInfo = buildString {
+                    append(item.evaluadorNombre)
+                    if (item.evaluadorEspecialidad.isNotBlank()) append(" · ${item.evaluadorEspecialidad}")
+                    if (item.evaluadorNivel.isNotBlank()) append(" · ${item.evaluadorNivel}")
+                }
+                Text(
+                    "Evaluado por: $evaluadorInfo",
+                    fontSize = 12.sp,
+                    color = Color(0xFF555555)
+                )
+            }
+
+            if (item.recomendacionMedico.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Recomendación médico:", fontSize = 12.sp, color = DarkBlue, fontWeight = FontWeight.SemiBold)
+                Text(item.recomendacionMedico, fontSize = 13.sp, color = Color.DarkGray)
+            }
+
+            if (item.recomendacionIA.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("✨", fontSize = 13.sp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Recomendación IA:", fontSize = 12.sp, color = Color(0xFF6200EE), fontWeight = FontWeight.SemiBold)
+                }
+                Text(item.recomendacionIA, fontSize = 13.sp, color = Color.DarkGray)
+            }
         }
     }
 }
