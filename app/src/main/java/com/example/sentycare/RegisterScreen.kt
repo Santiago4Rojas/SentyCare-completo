@@ -74,8 +74,11 @@ fun RegisterScreen(
     var camasTemporales by remember { mutableStateOf<List<String>>(emptyList()) }
     var showAddCamaTempDialog by remember { mutableStateOf(false) }
     var nuevaCamaTemp  by remember { mutableStateOf("") }
+    var camasOcupadas    by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var checkingCamaTemp by remember { mutableStateOf(false) }
+    var camasTempError   by remember { mutableStateOf("") }
 
-    val camasDisponibles = remember(camasTemporales, camasOcupadas, noDoc) {
+    val camasDisponibles = remember(camasTemporales, camasOcupadas) {
         val todas = (1..10).map { it.toString() } + camasTemporales
         todas.filter { cama -> cama !in camasOcupadas }
     }
@@ -99,9 +102,6 @@ fun RegisterScreen(
     var showCamaDialog   by remember { mutableStateOf(false) }
     var camaOcupadaPor   by remember { mutableStateOf("") }
     var isRegistering    by remember { mutableStateOf(false) }
-    var camasOcupadas    by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var checkingCamaTemp by remember { mutableStateOf(false) }
-    var camasTempError   by remember { mutableStateOf("") }
 
     // Solo campos de identidad son readonly en INACTIVE
     val isReadOnly = lookupState == LookupState.INACTIVE

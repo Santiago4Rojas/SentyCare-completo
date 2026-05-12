@@ -239,16 +239,11 @@ fun HomeScreen(
                 drawerContainerColor = Color.White,
                 modifier = Modifier.width(300.dp)
             ) {
-                // Header — white background with blue left accent bar
+                // Header — white background
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.White)
-                        .border(
-                            width = 1.dp,
-                            color = DarkBlue.copy(alpha = 0.15f),
-                            shape = androidx.compose.foundation.shape.RectangleShape
-                        )
                         .padding(start = 20.dp, top = 24.dp, end = 20.dp, bottom = 20.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
