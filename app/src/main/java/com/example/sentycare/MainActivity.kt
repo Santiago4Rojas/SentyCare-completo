@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
+import com.example.sentycare.data.Rol
 import com.example.sentycare.ui.screens.*
 import com.example.sentycare.ui.theme.SentyCareTheme
 
@@ -32,16 +33,18 @@ class MainActivity : ComponentActivity() {
                         PatientRepository.patients.toList()
                     )
                 }
-                var doctorName by remember { mutableStateOf("Doctor") }
 
                 when (currentScreen) {
 
                     // LOGIN
                     "login" -> LoginScreen(
                         onNavigateToRecovery = { currentScreen = "recovery" },
-                        onLoginClick = { nombre ->
-                            doctorName = nombre          // guarda el nombre en un var
-                            currentScreen = "home"
+                        onLoginClick = {
+                            if (SesionState.rol == Rol.ADMIN) {
+                                currentScreen = "admin"
+                            } else {
+                                currentScreen = "home"
+                            }
                         }
                     )
 
@@ -55,7 +58,6 @@ class MainActivity : ComponentActivity() {
 
                     // HOME
                     "home" -> HomeScreen(
-                        doctorName = doctorName,
                         onRegisterClick = {
                             currentScreen = "register"
                         },
@@ -64,8 +66,10 @@ class MainActivity : ComponentActivity() {
                             currentScreen = "evaluation"
                         },
                         onLogoutClick = {
+                            SesionState.limpiar()
                             currentScreen = "login"
-                        }
+                        },
+                        onAdminClick = { currentScreen = "admin" }
                     )
 
                     // REGISTRAR PACIENTE
@@ -204,6 +208,14 @@ class MainActivity : ComponentActivity() {
                         onHomeClick = { currentScreen = "home" },
                         onEvaluacionClick = { currentScreen = "evaluation" },
                         onHistorialClick = { currentScreen = "patientHistory" }
+                    )
+
+                    // ADMIN
+                    "admin" -> AdminScreen(
+                        onLogoutClick = {
+                            SesionState.limpiar()
+                            currentScreen = "login"
+                        }
                     )
                 }
             }

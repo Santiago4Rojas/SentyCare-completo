@@ -20,6 +20,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "GEMINI_API_KEY", "\"${(project.findProperty("GEMINI_API_KEY") ?: "")}\"")
     }
 
     buildTypes {
@@ -37,6 +38,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -59,9 +61,13 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
     implementation(platform("com.google.firebase:firebase-bom:33.8.0"))
-
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
-
     implementation("com.google.firebase:firebase-storage")
+
+    // Gemini AI para recomendaciones contextuales
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+
+    // Coroutines para llamadas asíncronas a la IA
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

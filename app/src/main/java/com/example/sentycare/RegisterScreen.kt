@@ -40,6 +40,8 @@ import com.example.sentycare.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.Calendar
 
+// Importamos SesionState para trazabilidad de quién registró el paciente
+
 private enum class LookupState { IDLE, LOADING, ACTIVE, INACTIVE, NOT_FOUND }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -474,11 +476,16 @@ fun RegisterScreen(
                                                         Toast.makeText(context, "Paciente no encontrado", Toast.LENGTH_SHORT).show()
                                                         return@addOnSuccessListener
                                                     }
-                                                    docRef.update(
-                                                        "numeroCama",  numeroCama,
-                                                        "diagnostico", diagnostico
+                                                    docRef.update(mapOf(
+                                                        "numeroCama"               to numeroCama,
+                                                        "diagnostico"              to diagnostico,
+                                                        "registradoPorId"          to SesionState.usuario.uid,
+                                                        "registradoPorNombre"      to SesionState.usuario.nombreCompleto,
+                                                        "registradoPorEspecialidad" to SesionState.usuario.especialidad,
+                                                        "registradoPorNivel"       to SesionState.usuario.nivel,
+                                                        "registradoEn"             to System.currentTimeMillis()
                                                         // activo se mantiene false; ConsentScreen lo pone en true
-                                                    ).addOnSuccessListener {
+                                                    )).addOnSuccessListener {
                                                         isRegistering = false
                                                         onRegisterClick(patient)   // → MainActivity navega a "consent"
                                                     }.addOnFailureListener { e ->
@@ -495,27 +502,38 @@ fun RegisterScreen(
                                         // ── NOT_FOUND: crear paciente nuevo ──────────────
                                         // activo=false; ConsentScreen lo pone en true
                                         LookupState.NOT_FOUND -> {
+                                            val registradoEn = System.currentTimeMillis()
                                             val patient = Patient(
-                                                nombre          = nombre,
-                                                apellido        = apellido,
-                                                genero          = genero,
-                                                noDoc           = noDoc,
-                                                fechaNacimiento = fechaNacimiento,
-                                                rh              = rh,
-                                                numeroCama      = numeroCama,
-                                                diagnostico     = diagnostico
+                                                nombre                   = nombre,
+                                                apellido                 = apellido,
+                                                genero                   = genero,
+                                                noDoc                    = noDoc,
+                                                fechaNacimiento          = fechaNacimiento,
+                                                rh                       = rh,
+                                                numeroCama               = numeroCama,
+                                                diagnostico              = diagnostico,
+                                                registradoPorId          = SesionState.usuario.uid,
+                                                registradoPorNombre      = SesionState.usuario.nombreCompleto,
+                                                registradoPorEspecialidad = SesionState.usuario.especialidad,
+                                                registradoPorNivel       = SesionState.usuario.nivel,
+                                                registradoEn             = registradoEn
                                             )
                                             db.collection("pacientes")
                                                 .add(hashMapOf(
-                                                    "nombre"          to patient.nombre,
-                                                    "apellido"        to patient.apellido,
-                                                    "genero"          to patient.genero,
-                                                    "noDoc"           to patient.noDoc,
-                                                    "fechaNacimiento" to patient.fechaNacimiento,
-                                                    "rh"              to patient.rh,
-                                                    "numeroCama"      to patient.numeroCama,
-                                                    "diagnostico"     to patient.diagnostico,
-                                                    "activo"          to false   // ConsentScreen lo activa
+                                                    "nombre"                   to patient.nombre,
+                                                    "apellido"                 to patient.apellido,
+                                                    "genero"                   to patient.genero,
+                                                    "noDoc"                    to patient.noDoc,
+                                                    "fechaNacimiento"          to patient.fechaNacimiento,
+                                                    "rh"                       to patient.rh,
+                                                    "numeroCama"               to patient.numeroCama,
+                                                    "diagnostico"              to patient.diagnostico,
+                                                    "activo"                   to false,
+                                                    "registradoPorId"          to patient.registradoPorId,
+                                                    "registradoPorNombre"      to patient.registradoPorNombre,
+                                                    "registradoPorEspecialidad" to patient.registradoPorEspecialidad,
+                                                    "registradoPorNivel"       to patient.registradoPorNivel,
+                                                    "registradoEn"             to patient.registradoEn
                                                 ))
                                                 .addOnSuccessListener {
                                                     isRegistering = false

@@ -29,7 +29,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.sentycare.ui.theme.*
+import com.example.sentycare.permissions.Permisos
 import com.google.firebase.firestore.FirebaseFirestore
+// SesionState se accede directamente desde el objeto singleton del mismo paquete
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -318,16 +320,18 @@ fun EvaluationScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Cama", fontSize = 13.sp, color = DarkBlue, fontWeight = FontWeight.SemiBold)
                         }
-                        OutlinedButton(
-                            onClick = { showAltaDialog = true },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE53935)),
-                            contentPadding = PaddingValues(vertical = 10.dp)
-                        ) {
-                            Icon(Icons.Outlined.ExitToApp, contentDescription = null, tint = Color(0xFFE53935), modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Alta", fontSize = 13.sp, color = Color(0xFFE53935), fontWeight = FontWeight.SemiBold)
+                        if (Permisos.puedeDarDeAlta(SesionState.rol)) {
+                            OutlinedButton(
+                                onClick = { showAltaDialog = true },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE53935)),
+                                contentPadding = PaddingValues(vertical = 10.dp)
+                            ) {
+                                Icon(Icons.Outlined.ExitToApp, contentDescription = null, tint = Color(0xFFE53935), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Alta", fontSize = 13.sp, color = Color(0xFFE53935), fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
 

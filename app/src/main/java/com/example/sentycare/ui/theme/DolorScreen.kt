@@ -28,6 +28,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import kotlinx.coroutines.launch
+import com.example.sentycare.SesionState
+import com.example.sentycare.ai.ContextoEvaluacion
+import com.example.sentycare.ai.RecomendacionAIService
+import com.example.sentycare.permissions.Permisos
 import com.example.sentycare.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -94,11 +101,67 @@ fun DolorScreen(
 ) {
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var escala by remember { mutableStateOf<DolorEscala?>(null) }
     var step by remember { mutableIntStateOf(0) }
     val flaccScores = remember { mutableStateListOf<Int?>(null, null, null, null, null) }
     var facesScore by remember { mutableStateOf<Int?>(null) }
     var showResult by remember { mutableStateOf(false) }
+    var recomendacionMedico by remember { mutableStateOf("") }
+    var iaRecomendacion by remember { mutableStateOf("") }
+    var iaCargando by remember { mutableStateOf(false) }
+    var guardado by remember { mutableStateOf(false) }
+    var guardando by remember { mutableStateOf(false) }
+
+    fun guardarEvaluacion(nombreEscala: String, puntaje: Int, clasificacion: String, recommendations: List<String>, onSuccess: () -> Unit) {
+        if (guardado || guardando) return
+        guardando = true
+        val data = hashMapOf(
+            "pacienteNombre"             to "${patient.nombre} ${patient.apellido}",
+            "pacienteDocumento"          to patient.noDoc,
+            "escala"                     to nombreEscala,
+            "puntaje"                    to puntaje,
+            "clasificacion"              to clasificacion,
+            "fecha"                      to System.currentTimeMillis(),
+            "evaluadorId"                to SesionState.usuario.uid,
+            "evaluadorNombre"            to SesionState.usuario.nombreCompleto,
+            "evaluadorEspecialidad"      to SesionState.usuario.especialidad,
+            "evaluadorNivel"             to SesionState.usuario.nivel,
+            "recomendacionesAutomaticas" to recommendations,
+            "recomendacionMedico"        to recomendacionMedico,
+            "recomendacionIA"            to "",
+            "recomendacionIAGeneradaEn"  to 0L
+        )
+        db.collection("evaluaciones").add(data)
+            .addOnSuccessListener { docRef ->
+                guardado  = true
+                guardando = false
+                Toast.makeText(context, "Evaluación guardada", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    iaCargando = true
+                    val iaTexto = RecomendacionAIService.generarRecomendacion(
+                        ContextoEvaluacion(
+                            escala          = nombreEscala,
+                            puntaje         = puntaje,
+                            clasificacion   = clasificacion,
+                            nombrePaciente  = "${patient.nombre} ${patient.apellido}",
+                            diagnostico     = patient.diagnostico,
+                            fechaNacimiento = patient.fechaNacimiento
+                        )
+                    )
+                    iaCargando = false
+                    if (iaTexto.isNotBlank()) {
+                        iaRecomendacion = iaTexto
+                        docRef.update("recomendacionIA", iaTexto, "recomendacionIAGeneradaEn", System.currentTimeMillis())
+                    }
+                }
+                onSuccess()
+            }
+            .addOnFailureListener { e ->
+                guardando = false
+                Toast.makeText(context, "Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
 
     BackHandler {                          // ← AQUÍ
         when {
@@ -155,33 +218,49 @@ fun DolorScreen(
                 currentEscala == DolorEscala.FACES && !isResult -> FacesSelectionStep(selectedScore = facesScore, onSelect = { facesScore = it }, onEvaluate = { if (facesScore != null) showResult = true })
                 currentEscala == DolorEscala.FLACC && isResult -> {
                     val total = flaccScores.filterNotNull().sum()
-                    LaunchedEffect(Unit) {
-                        val result = interpretFlacc(total)
-                        db.collection("evaluaciones").add(hashMapOf("pacienteNombre" to "${patient.nombre} ${patient.apellido}", "pacienteDocumento" to patient.noDoc, "escala" to "Dolor FLACC", "puntaje" to total, "clasificacion" to result.label, "fecha" to System.currentTimeMillis()))
-                        Toast.makeText(context, "Evaluación guardada", Toast.LENGTH_SHORT).show()
-                    }
+                    val flaccResult = interpretFlacc(total)
                     DolorResultStep(
-                        scoreDisplay = total.toString(), maxScore = 10, numericScore = total, result = interpretFlacc(total), escalaLabel = "FLACC (0–10)",
+                        scoreDisplay = total.toString(), maxScore = 10, numericScore = total,
+                        result = flaccResult, escalaLabel = "FLACC (0–10)",
                         rangeLabels = listOf("0 Sin dolor", "1-3 Leve", "4-6 Moderado", "7-10 Severo"),
                         rangeColors = listOf(Color(0xFF4CAF50), Color(0xFF8BC34A), Color(0xFFFFC107), Color(0xFFF44336)),
                         activeRange = when (total) { 0 -> 0; in 1..3 -> 1; in 4..6 -> 2; else -> 3 },
-                        onNewEvaluation = { flaccScores.replaceAll { null }; step = 0; showResult = false; escala = null; onNewEvaluation() },
+                        recomendacionMedico = recomendacionMedico,
+                        onRecomendacionMedicoChange = { recomendacionMedico = it },
+                        iaRecomendacion = iaRecomendacion,
+                        iaCargando = iaCargando,
+                        guardado = guardado,
+                        guardando = guardando,
+                        onGuardar = { guardarEvaluacion("Dolor FLACC", total, flaccResult.label, flaccResult.recommendations) {} },
+                        onNewEvaluation = {
+                            flaccScores.replaceAll { null }; step = 0; showResult = false; escala = null
+                            recomendacionMedico = ""; iaRecomendacion = ""; guardado = false
+                            onNewEvaluation()
+                        },
                         onHome = onHomeClick
                     )
                 }
                 currentEscala == DolorEscala.FACES && isResult -> {
                     val s = facesScore ?: 0
-                    LaunchedEffect(Unit) {
-                        val result = interpretFaces(s)
-                        db.collection("evaluaciones").add(hashMapOf("pacienteNombre" to "${patient.nombre} ${patient.apellido}", "pacienteDocumento" to patient.noDoc, "escala" to "Dolor FACES", "puntaje" to s, "clasificacion" to result.label, "fecha" to System.currentTimeMillis()))
-                        Toast.makeText(context, "Evaluación guardada", Toast.LENGTH_SHORT).show()
-                    }
+                    val facesResult = interpretFaces(s)
                     DolorResultStep(
-                        scoreDisplay = FACES_OPTIONS.first { it.score == s }.emoji, maxScore = 10, numericScore = s, result = interpretFaces(s), escalaLabel = "FACES (0–10)",
+                        scoreDisplay = FACES_OPTIONS.first { it.score == s }.emoji, maxScore = 10, numericScore = s,
+                        result = facesResult, escalaLabel = "FACES (0–10)",
                         rangeLabels = listOf("0", "2", "4", "6", "8", "10"),
                         rangeColors = listOf(Color(0xFF4CAF50), Color(0xFF8BC34A), Color(0xFFFFEB3B), Color(0xFFFFC107), Color(0xFFFF7043), Color(0xFFF44336)),
                         activeRange = FACES_OPTIONS.indexOfFirst { it.score == s },
-                        onNewEvaluation = { facesScore = null; showResult = false; escala = null; onNewEvaluation() },
+                        recomendacionMedico = recomendacionMedico,
+                        onRecomendacionMedicoChange = { recomendacionMedico = it },
+                        iaRecomendacion = iaRecomendacion,
+                        iaCargando = iaCargando,
+                        guardado = guardado,
+                        guardando = guardando,
+                        onGuardar = { guardarEvaluacion("Dolor FACES", s, facesResult.label, facesResult.recommendations) {} },
+                        onNewEvaluation = {
+                            facesScore = null; showResult = false; escala = null
+                            recomendacionMedico = ""; iaRecomendacion = ""; guardado = false
+                            onNewEvaluation()
+                        },
                         onHome = onHomeClick
                     )
                 }
@@ -433,7 +512,20 @@ fun FacesSelectionStep(selectedScore: Int?, onSelect: (Int) -> Unit, onEvaluate:
 }
 
 @Composable
-fun DolorResultStep(scoreDisplay: String, maxScore: Int, numericScore: Int, result: DolorResult, escalaLabel: String, rangeLabels: List<String>, rangeColors: List<Color>, activeRange: Int, onNewEvaluation: () -> Unit, onHome: () -> Unit) {
+fun DolorResultStep(
+    scoreDisplay: String, maxScore: Int, numericScore: Int,
+    result: DolorResult, escalaLabel: String,
+    rangeLabels: List<String>, rangeColors: List<Color>, activeRange: Int,
+    recomendacionMedico: String = "",
+    onRecomendacionMedicoChange: (String) -> Unit = {},
+    iaRecomendacion: String = "",
+    iaCargando: Boolean = false,
+    guardado: Boolean = false,
+    guardando: Boolean = false,
+    onGuardar: () -> Unit = {},
+    onNewEvaluation: () -> Unit,
+    onHome: () -> Unit
+) {
     Column(
         modifier = Modifier.fillMaxSize().background(Color(0xFFF0F4F8)).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -448,9 +540,11 @@ fun DolorResultStep(scoreDisplay: String, maxScore: Int, numericScore: Int, resu
             Text(result.label, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
         }
         Spacer(modifier = Modifier.height(24.dp))
+
+        // Recomendaciones automáticas
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Recomendación", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkBlue)
+                Text("Recomendación clínica", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkBlue)
                 Spacer(modifier = Modifier.height(12.dp))
                 result.recommendations.forEach { rec ->
                     Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
@@ -461,6 +555,56 @@ fun DolorResultStep(scoreDisplay: String, maxScore: Int, numericScore: Int, resu
                 }
             }
         }
+
+        // Campo abierto de recomendación médica
+        if (Permisos.puedeAgregarRecomendacionMedico(SesionState.rol)) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Recomendación del médico", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkBlue)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = recomendacionMedico,
+                        onValueChange = onRecomendacionMedicoChange,
+                        placeholder = { Text("Escriba su recomendación clínica adicional...", fontSize = 13.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 6,
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = !guardado,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = DarkBlue,
+                            unfocusedBorderColor = Color(0xFFCCCCCC)
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default)
+                    )
+                }
+            }
+        }
+
+        // Recomendación IA
+        Spacer(modifier = Modifier.height(16.dp))
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F0FF)), elevation = CardDefaults.cardElevation(2.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("✨", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Recomendación IA", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6200EE))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                when {
+                    iaCargando -> {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Color(0xFF6200EE))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Generando recomendación basada en protocolos PICU...", fontSize = 12.sp, color = Color.Gray)
+                    }
+                    iaRecomendacion.isNotBlank() -> Text(iaRecomendacion, fontSize = 14.sp, color = Color.DarkGray, lineHeight = 22.sp)
+                    guardado -> Text("Sin respuesta de la IA en este momento.", fontSize = 13.sp, color = Color.Gray)
+                    else -> Text("Se generará al guardar la evaluación.", fontSize = 13.sp, color = Color.Gray)
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
         Text("Referencia de rangos:", fontSize = 13.sp, color = Color.Gray, modifier = Modifier.align(Alignment.Start))
         Spacer(modifier = Modifier.height(10.dp))
@@ -479,6 +623,24 @@ fun DolorResultStep(scoreDisplay: String, maxScore: Int, numericScore: Int, resu
             }
         }
         Spacer(modifier = Modifier.height(32.dp))
+
+        if (!guardado) {
+            Button(
+                onClick = onGuardar,
+                enabled = !guardando,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = DarkBlue)
+            ) {
+                if (guardando) {
+                    CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("Guardar evaluación", color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onNewEvaluation, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(10.dp), border = BorderStroke(1.5.dp, DarkBlue), colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White, contentColor = DarkBlue)) {
                 Text("Nueva evaluación", color = DarkBlue, fontWeight = FontWeight.Medium, fontSize = 14.sp)
