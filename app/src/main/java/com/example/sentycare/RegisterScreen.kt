@@ -109,7 +109,7 @@ fun RegisterScreen(
     }
 
     fun lookupPatient(doc: String) {
-        if (doc.length != 10) { resetForm(); return }
+        if (doc.length !in 6..10) { resetForm(); return }
         lookupState = LookupState.LOADING
         db.collection("pacientes")
             .whereEqualTo("noDoc", doc)
@@ -192,7 +192,7 @@ fun RegisterScreen(
     val formValidNotFound =
         lookupState == LookupState.NOT_FOUND &&
                 nombre.isNotBlank() && apellido.isNotBlank() && genero.isNotBlank() &&
-                noDoc.length == 10 && fechaNacimiento.isNotBlank() && rh.isNotBlank() &&
+                noDoc.length in 6..10 && fechaNacimiento.isNotBlank() && rh.isNotBlank() &&
                 numeroCama.isNotBlank() && diagnostico.isNotBlank()
 
     val formValidInactive =
@@ -350,12 +350,12 @@ fun RegisterScreen(
                 value        = noDoc,
                 onChange     = { new ->
                     noDoc = new
-                    if (new.length != 10) resetForm() else lookupPatient(new)
+                    if (new.length < 6) resetForm() else lookupPatient(new)
                 },
-                placeholder  = "10 dígitos",
+                placeholder  = "6–10 dígitos",
                 keyboardType = KeyboardType.Number,
                 maxLength    = 10,
-                minLength    = 10
+                minLength    = 6
             )
 
             if (lookupState == LookupState.LOADING) {
@@ -557,7 +557,6 @@ fun RegisterScreen(
                                                         "registradoPorId"          to SesionState.usuario.uid,
                                                         "registradoPorNombre"      to SesionState.usuario.nombreCompleto,
                                                         "registradoPorEspecialidad" to SesionState.usuario.especialidad,
-                                                        "registradoPorNivel"       to SesionState.usuario.nivel,
                                                         "registradoEn"             to System.currentTimeMillis()
                                                         // activo se mantiene false; ConsentScreen lo pone en true
                                                     )).addOnSuccessListener {
@@ -590,7 +589,6 @@ fun RegisterScreen(
                                                 registradoPorId          = SesionState.usuario.uid,
                                                 registradoPorNombre      = SesionState.usuario.nombreCompleto,
                                                 registradoPorEspecialidad = SesionState.usuario.especialidad,
-                                                registradoPorNivel       = SesionState.usuario.nivel,
                                                 registradoEn             = registradoEn
                                             )
                                             db.collection("pacientes")
@@ -607,7 +605,6 @@ fun RegisterScreen(
                                                     "registradoPorId"          to patient.registradoPorId,
                                                     "registradoPorNombre"      to patient.registradoPorNombre,
                                                     "registradoPorEspecialidad" to patient.registradoPorEspecialidad,
-                                                    "registradoPorNivel"       to patient.registradoPorNivel,
                                                     "registradoEn"             to patient.registradoEn
                                                 ))
                                                 .addOnSuccessListener {

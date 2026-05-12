@@ -7,7 +7,6 @@ data class Usuario(
     val email: String = "",
     val rol: String = "",
     val especialidad: String = "",
-    val nivel: String = "",
     val noDoc: String = "",
     val rh: String = "",
     val activo: Boolean = true,

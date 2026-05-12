@@ -229,7 +229,6 @@ object PdfExportHelper {
             val evalInfo = buildString {
                 append(ev.evaluadorNombre)
                 if (ev.evaluadorEspecialidad.isNotBlank()) append(" · ${ev.evaluadorEspecialidad}")
-                if (ev.evaluadorNivel.isNotBlank()) append(" · ${ev.evaluadorNivel}")
             }
             canvas.drawText("Evaluado por: $evalInfo", MARGIN, y, paintSmall)
             y += LINE_HEIGHT

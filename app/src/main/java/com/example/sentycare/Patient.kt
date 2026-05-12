@@ -21,6 +21,5 @@ data class Patient(
     val registradoPorId: String = "",
     val registradoPorNombre: String = "",
     val registradoPorEspecialidad: String = "",
-    val registradoPorNivel: String = "",
     val registradoEn: Long = 0L
 )

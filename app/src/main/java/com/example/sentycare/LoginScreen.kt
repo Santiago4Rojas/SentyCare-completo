@@ -150,7 +150,6 @@ fun LoginScreen(
                                         email        = email,
                                         rol          = Rol.fromString(doc.getString("rol") ?: ""),
                                         especialidad = doc.getString("especialidad") ?: "",
-                                        nivel        = doc.getString("nivel") ?: "",
                                         noDoc        = doc.getString("noDoc") ?: "",
                                         rh           = doc.getString("rh") ?: ""
                                     )

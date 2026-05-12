@@ -147,7 +147,6 @@ fun DolorScreen(
             "evaluadorId"                to SesionState.usuario.uid,
             "evaluadorNombre"            to SesionState.usuario.nombreCompleto,
             "evaluadorEspecialidad"      to SesionState.usuario.especialidad,
-            "evaluadorNivel"             to SesionState.usuario.nivel,
             "recomendacionesAutomaticas" to recommendations,
             "recomendacionMedico"        to recomendacionMedico,
             "recomendacionIA"            to "",
