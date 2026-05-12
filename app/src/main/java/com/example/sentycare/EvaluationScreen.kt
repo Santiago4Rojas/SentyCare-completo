@@ -75,7 +75,7 @@ fun EvaluationScreen(
                     Text(
                         "Nueva cama para ${currentPatient.nombre}",
                         fontSize = 14.sp,
-                        color = DarkBlueVariant
+                        color = LightGray
                     )
                     Spacer(Modifier.height(16.dp))
                     OutlinedTextField(
@@ -204,14 +204,14 @@ fun EvaluationScreen(
                             append(" será retirado de la lista de pacientes activos.")
                         },
                         fontSize = 14.sp,
-                        color = DarkBlueVariant,
+                        color = LightGray,
                         lineHeight = 22.sp
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
                         "Esta acción no se puede deshacer.",
                         fontSize = 13.sp,
-                        color = DarkBlueVariant,
+                        color = LightGray,
                         lineHeight = 20.sp
                     )
                     Spacer(Modifier.height(24.dp))
