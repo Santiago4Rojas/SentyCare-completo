@@ -169,7 +169,7 @@ fun RegisterScreen(
     if (showAddCamaTempDialog) {
         AlertDialog(
             onDismissRequest = { showAddCamaTempDialog = false; nuevaCamaTemp = ""; camasTempError = "" },
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.White,
             shape = RoundedCornerShape(16.dp),
             title = { Text("Agregar cama temporal", fontWeight = FontWeight.Medium) },
             text = {
@@ -246,7 +246,7 @@ fun RegisterScreen(
     if (showActiveDialog) {
         AlertDialog(
             onDismissRequest = {},
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.White,
             shape = RoundedCornerShape(16.dp),
             title = null,
             text = {
@@ -299,7 +299,7 @@ fun RegisterScreen(
     if (showCamaDialog) {
         AlertDialog(
             onDismissRequest = {},
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.White,
             shape = RoundedCornerShape(16.dp),
             title = null,
             text = {
@@ -412,15 +412,15 @@ fun RegisterScreen(
                 Spacer(Modifier.height(12.dp))
                 Card(
                     shape  = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+                    colors = CardDefaults.cardColors(containerColor = DarkBlue.copy(alpha = 0.07f))
                 ) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("ℹ️", fontSize = 18.sp)
+                        Icon(Icons.Outlined.Info, null, tint = DarkBlue, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(10.dp))
                         Text(
                             "Paciente encontrado como inactivo. Datos cargados automáticamente. " +
                                     "Asigne una cama y diagnóstico, luego presione Registrar.",
-                            fontSize = 13.sp, color = Color(0xFF0D47A1), lineHeight = 19.sp
+                            fontSize = 13.sp, color = DarkBlue, lineHeight = 19.sp
                         )
                     }
                 }

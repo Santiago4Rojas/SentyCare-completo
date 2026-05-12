@@ -159,20 +159,26 @@ fun RassScreen(
                 Toast.makeText(context, "Evaluación guardada", Toast.LENGTH_SHORT).show()
                 scope.launch {
                     iaCargando = true
-                    val iaTexto = RecomendacionAIService.generarRecomendacion(
-                        ContextoEvaluacion(
-                            escala          = "RASS",
-                            puntaje         = score,
-                            clasificacion   = result.label,
-                            nombrePaciente  = "${patient.nombre} ${patient.apellido}",
-                            diagnostico     = patient.diagnostico,
-                            fechaNacimiento = patient.fechaNacimiento
+                    try {
+                        val iaTexto = RecomendacionAIService.generarRecomendacion(
+                            ContextoEvaluacion(
+                                escala          = "RASS",
+                                puntaje         = score,
+                                clasificacion   = result.label,
+                                nombrePaciente  = "${patient.nombre} ${patient.apellido}",
+                                diagnostico     = patient.diagnostico,
+                                fechaNacimiento = patient.fechaNacimiento
+                            )
                         )
-                    )
-                    iaCargando = false
-                    if (iaTexto.isNotBlank()) {
-                        iaRecomendacion = iaTexto
-                        docRef.update("recomendacionIA", iaTexto, "recomendacionIAGeneradaEn", System.currentTimeMillis())
+                        if (iaTexto.isNotBlank()) {
+                            iaRecomendacion = iaTexto
+                            docRef.update("recomendacionIA", iaTexto, "recomendacionIAGeneradaEn", System.currentTimeMillis())
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("RassScreen", "Error IA: ${e.message}", e)
+                        Toast.makeText(context, "IA no disponible: ${e.message?.take(60)}", Toast.LENGTH_LONG).show()
+                    } finally {
+                        iaCargando = false
                     }
                 }
                 onSuccess()

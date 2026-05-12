@@ -30,6 +30,13 @@ import com.example.sentycare.ui.theme.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
+@Composable
+private fun tfColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor   = DarkBlue,
+    unfocusedBorderColor = LightGray,
+    focusedLabelColor    = DarkBlue
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminScreen(
@@ -273,14 +280,14 @@ fun EditarUsuarioDialog(usuario: Usuario, onDismiss: () -> Unit, onGuardar: (Map
         title = { Text("Editar usuario", fontWeight = FontWeight.Bold, color = DarkBlue) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = nombre, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) nombre = v }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = apellido, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) apellido = v }, label = { Text("Apellido") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = nombre, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) nombre = v }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors())
+                OutlinedTextField(value = apellido, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) apellido = v }, label = { Text("Apellido") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors())
 
                 ExposedDropdownMenuBox(expanded = showRolMenu, onExpandedChange = { showRolMenu = it }) {
                     OutlinedTextField(
                         value = rolSeleccionado.displayName, onValueChange = {}, readOnly = true,
                         label = { Text("Rol") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showRolMenu) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(8.dp)
+                        modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(8.dp), colors = tfColors()
                     )
                     ExposedDropdownMenu(expanded = showRolMenu, onDismissRequest = { showRolMenu = false }) {
                         Rol.entries.forEach { r ->
@@ -289,22 +296,19 @@ fun EditarUsuarioDialog(usuario: Usuario, onDismiss: () -> Unit, onGuardar: (Map
                     }
                 }
 
-                OutlinedTextField(value = especialidad, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' || it == '.' }) especialidad = v }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = especialidad, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' || it == '.' }) especialidad = v }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors())
                 OutlinedTextField(
-                    value = noDoc,
-                    onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) noDoc = it },
-                    label = { Text("Documento de identidad") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    singleLine = true,
-                    supportingText = { Text("6–10 dígitos", fontSize = 11.sp, color = Color.Gray) }
+                    value = noDoc, onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) noDoc = it },
+                    label = { Text("Documento de identidad") }, modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors(),
+                    supportingText = { Text("6–10 dígitos", fontSize = 11.sp, color = LightGray) }
                 )
                 ExposedDropdownMenuBox(expanded = showRhMenu, onExpandedChange = { showRhMenu = it }) {
                     OutlinedTextField(
                         value = rh, onValueChange = {}, readOnly = true,
                         label = { Text("RH / Tipo de sangre") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showRhMenu) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(8.dp)
+                        modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(8.dp), colors = tfColors()
                     )
                     ExposedDropdownMenu(expanded = showRhMenu, onDismissRequest = { showRhMenu = false }) {
                         tiposDeSangre.forEach { tipo ->
@@ -377,29 +381,29 @@ fun CrearUsuarioDialog(onDismiss: () -> Unit, onCrear: (String, String, Usuario)
         title = { Text("Crear usuario", fontWeight = FontWeight.Bold, color = DarkBlue) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = nombre, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) nombre = v }, label = { Text("Nombre *") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = apellido, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) apellido = v }, label = { Text("Apellido") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
-                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Correo electrónico *") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = nombre, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) nombre = v }, label = { Text("Nombre *") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors())
+                OutlinedTextField(value = apellido, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' }) apellido = v }, label = { Text("Apellido") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors())
+                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Correo electrónico *") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors())
                 OutlinedTextField(
                     value = password, onValueChange = { password = it },
                     label = { Text("Contraseña *") }, modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp), singleLine = true,
+                    shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors(),
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showPassword = !showPassword }) {
-                            Icon(if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, null, tint = Color.Gray)
+                            Icon(if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, null, tint = LightGray)
                         }
                     }
                 )
                 OutlinedTextField(
                     value = confirmPassword, onValueChange = { confirmPassword = it },
                     label = { Text("Confirmar contraseña *") }, modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp), singleLine = true,
+                    shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors(),
                     isError = confirmPassword.isNotBlank() && !passwordsMatch,
                     visualTransformation = if (showConfirm) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showConfirm = !showConfirm }) {
-                            Icon(if (showConfirm) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, null, tint = Color.Gray)
+                            Icon(if (showConfirm) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, null, tint = LightGray)
                         }
                     }
                 )
@@ -427,22 +431,19 @@ fun CrearUsuarioDialog(onDismiss: () -> Unit, onCrear: (String, String, Usuario)
                     }
                 }
 
-                OutlinedTextField(value = especialidad, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' || it == '.' }) especialidad = v }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true)
+                OutlinedTextField(value = especialidad, onValueChange = { v -> if (v.all { it.isLetter() || it == ' ' || it == '.' }) especialidad = v }, label = { Text("Especialidad") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors())
                 OutlinedTextField(
-                    value = noDoc,
-                    onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) noDoc = it },
-                    label = { Text("Documento de identidad") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    singleLine = true,
-                    supportingText = { Text("6–10 dígitos", fontSize = 11.sp, color = Color.Gray) }
+                    value = noDoc, onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) noDoc = it },
+                    label = { Text("Documento de identidad") }, modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp), singleLine = true, colors = tfColors(),
+                    supportingText = { Text("6–10 dígitos", fontSize = 11.sp, color = LightGray) }
                 )
                 ExposedDropdownMenuBox(expanded = showRhMenu, onExpandedChange = { showRhMenu = it }) {
                     OutlinedTextField(
                         value = rh, onValueChange = {}, readOnly = true,
                         label = { Text("RH / Tipo de sangre") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showRhMenu) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(8.dp)
+                        modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(8.dp), colors = tfColors()
                     )
                     ExposedDropdownMenu(expanded = showRhMenu, onDismissRequest = { showRhMenu = false }) {
                         tiposDeSangre.forEach { tipo ->

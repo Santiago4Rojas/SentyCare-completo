@@ -159,20 +159,26 @@ fun DolorScreen(
                 Toast.makeText(context, "Evaluación guardada", Toast.LENGTH_SHORT).show()
                 scope.launch {
                     iaCargando = true
-                    val iaTexto = RecomendacionAIService.generarRecomendacion(
-                        ContextoEvaluacion(
-                            escala          = nombreEscala,
-                            puntaje         = puntaje,
-                            clasificacion   = clasificacion,
-                            nombrePaciente  = "${patient.nombre} ${patient.apellido}",
-                            diagnostico     = patient.diagnostico,
-                            fechaNacimiento = patient.fechaNacimiento
+                    try {
+                        val iaTexto = RecomendacionAIService.generarRecomendacion(
+                            ContextoEvaluacion(
+                                escala          = nombreEscala,
+                                puntaje         = puntaje,
+                                clasificacion   = clasificacion,
+                                nombrePaciente  = "${patient.nombre} ${patient.apellido}",
+                                diagnostico     = patient.diagnostico,
+                                fechaNacimiento = patient.fechaNacimiento
+                            )
                         )
-                    )
-                    iaCargando = false
-                    if (iaTexto.isNotBlank()) {
-                        iaRecomendacion = iaTexto
-                        docRef.update("recomendacionIA", iaTexto, "recomendacionIAGeneradaEn", System.currentTimeMillis())
+                        if (iaTexto.isNotBlank()) {
+                            iaRecomendacion = iaTexto
+                            docRef.update("recomendacionIA", iaTexto, "recomendacionIAGeneradaEn", System.currentTimeMillis())
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("DolorScreen", "Error IA: ${e.message}", e)
+                        Toast.makeText(context, "IA no disponible: ${e.message?.take(60)}", Toast.LENGTH_LONG).show()
+                    } finally {
+                        iaCargando = false
                     }
                 }
                 onSuccess()
