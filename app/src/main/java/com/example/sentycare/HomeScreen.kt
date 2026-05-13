@@ -2,14 +2,10 @@ package com.example.sentycare
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
-import coil.compose.AsyncImage
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -52,7 +48,6 @@ import com.example.sentycare.ui.theme.*
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -93,37 +88,6 @@ fun HomeScreen(
     var newCamaValue by remember { mutableStateOf("") }
     var sortBy by remember { mutableStateOf(SortBy.FECHA) }
     var showChangePassword by remember { mutableStateOf(false) }
-    var fotoUrl by remember { mutableStateOf(SesionState.usuario.fotoUrl) }
-    var uploadingPhoto by remember { mutableStateOf(false) }
-
-    val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri ?: return@rememberLauncherForActivityResult
-        val uid = auth.currentUser?.uid ?: run {
-            Toast.makeText(context, "Sesión no válida", Toast.LENGTH_SHORT).show()
-            return@rememberLauncherForActivityResult
-        }
-        uploadingPhoto = true
-        val ref = FirebaseStorage.getInstance().reference.child("profilePhotos/$uid.jpg")
-        ref.putFile(uri)
-            .addOnSuccessListener {
-                ref.downloadUrl
-                    .addOnSuccessListener { downloadUri ->
-                        val url = downloadUri.toString()
-                        fotoUrl = url
-                        SesionState.usuario = SesionState.usuario.copy(fotoUrl = url)
-                        db.collection("usuarios").document(uid).update("fotoUrl", url)
-                        uploadingPhoto = false
-                    }
-                    .addOnFailureListener { _: Exception ->
-                        uploadingPhoto = false
-                        Toast.makeText(context, "Error al obtener URL de foto", Toast.LENGTH_SHORT).show()
-                    }
-            }
-            .addOnFailureListener { _: Exception ->
-                uploadingPhoto = false
-                Toast.makeText(context, "Error al subir foto", Toast.LENGTH_SHORT).show()
-            }
-    }
 
     LaunchedEffect(Unit) {
         db.collection("pacientes").get().addOnSuccessListener { result ->
@@ -260,7 +224,7 @@ fun HomeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(DarkBlue)
+                        .background(Color.White)
                         .padding(horizontal = 20.dp, vertical = 18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -272,61 +236,35 @@ fun HomeScreen(
                     Spacer(Modifier.width(12.dp))
                     Text(
                         "SentyCare",
-                        color = Color.White,
+                        color = DarkBlue,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-                // Header — white background
+                // Header — user info
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.White)
-                        .padding(start = 20.dp, top = 24.dp, end = 20.dp, bottom = 20.dp)
+                        .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 20.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Avatar with photo or initials + edit button
-                        Box(contentAlignment = Alignment.BottomEnd) {
-                            Box(
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(CircleShape)
-                                    .background(DarkBlue)
-                                    .border(2.dp, DarkBlue, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (fotoUrl.isNotBlank()) {
-                                    AsyncImage(
-                                        model = fotoUrl,
-                                        contentDescription = "Foto de perfil",
-                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                    )
-                                } else {
-                                    val initials = buildString {
-                                        SesionState.usuario.nombre.firstOrNull()?.let { append(it.uppercaseChar()) }
-                                        SesionState.usuario.apellido.firstOrNull()?.let { append(it.uppercaseChar()) }
-                                    }.ifBlank { "?" }
-                                    Text(initials, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            // Edit/camera button
-                            Box(
-                                modifier = Modifier
-                                    .size(22.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                                    .border(1.5.dp, DarkBlue, CircleShape)
-                                    .clickable { photoPickerLauncher.launch("image/*") },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (uploadingPhoto) {
-                                    CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp, color = DarkBlue)
-                                } else {
-                                    Icon(Icons.Outlined.CameraAlt, null, tint = DarkBlue, modifier = Modifier.size(12.dp))
-                                }
-                            }
+                        // Avatar — role color circle with person icon
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(rolColor(SesionState.rol)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.Person,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(38.dp)
+                            )
                         }
                         Spacer(Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
