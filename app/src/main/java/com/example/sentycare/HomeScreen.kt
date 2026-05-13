@@ -7,6 +7,8 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -138,7 +140,10 @@ fun HomeScreen(
             SortBy.FECHA -> patients.sortedByDescending { it.registradoEn }
             SortBy.NOMBRE -> patients.sortedBy { "${it.nombre} ${it.apellido}" }
             SortBy.CAMA -> patients.sortedBy { it.numeroCama.padStart(3, '0') }
-            SortBy.DIAGNOSTICO -> patients.sortedBy { it.diagnostico.lowercase() }
+            SortBy.DIAGNOSTICO -> patients.sortedBy {
+                java.text.Normalizer.normalize(it.diagnostico.lowercase(), java.text.Normalizer.Form.NFD)
+                    .replace(Regex("[^\\p{ASCII}]"), "")
+            }
             SortBy.RH -> patients.sortedBy { it.rh }
         }
     }
@@ -251,6 +256,28 @@ fun HomeScreen(
                 drawerContainerColor = Color.White,
                 modifier = Modifier.width(300.dp)
             ) {
+                // Brand header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(DarkBlue)
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.logosentycare),
+                        contentDescription = null,
+                        modifier = Modifier.size(38.dp).clip(CircleShape)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "SentyCare",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 // Header — white background
                 Box(
                     modifier = Modifier
@@ -399,7 +426,7 @@ fun HomeScreen(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("SentyCare", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Bienvenido", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
                         Text(
                             text = SesionState.usuario.nombreCompleto.ifBlank { "Usuario" },
                             color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold
