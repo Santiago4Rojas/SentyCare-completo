@@ -7,8 +7,6 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -98,21 +96,31 @@ fun HomeScreen(
 
     val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
-        uploadingPhoto = true
-        val uid = auth.currentUser?.uid ?: return@rememberLauncherForActivityResult
-        val ref = FirebaseStorage.getInstance().reference.child("profilePhotos/$uid.jpg")
-        ref.putFile(uri).addOnSuccessListener {
-            ref.downloadUrl.addOnSuccessListener { downloadUri ->
-                val url = downloadUri.toString()
-                fotoUrl = url
-                SesionState.usuario = SesionState.usuario.copy(fotoUrl = url)
-                db.collection("usuarios").document(uid).update("fotoUrl", url)
-                uploadingPhoto = false
-            }
-        }.addOnFailureListener {
-            uploadingPhoto = false
-            Toast.makeText(context, "Error al subir foto", Toast.LENGTH_SHORT).show()
+        val uid = auth.currentUser?.uid ?: run {
+            Toast.makeText(context, "Sesión no válida", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
         }
+        uploadingPhoto = true
+        val ref = FirebaseStorage.getInstance().reference.child("profilePhotos/$uid.jpg")
+        ref.putFile(uri)
+            .addOnSuccessListener {
+                ref.downloadUrl
+                    .addOnSuccessListener { downloadUri ->
+                        val url = downloadUri.toString()
+                        fotoUrl = url
+                        SesionState.usuario = SesionState.usuario.copy(fotoUrl = url)
+                        db.collection("usuarios").document(uid).update("fotoUrl", url)
+                        uploadingPhoto = false
+                    }
+                    .addOnFailureListener { _: Exception ->
+                        uploadingPhoto = false
+                        Toast.makeText(context, "Error al obtener URL de foto", Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .addOnFailureListener { _: Exception ->
+                uploadingPhoto = false
+                Toast.makeText(context, "Error al subir foto", Toast.LENGTH_SHORT).show()
+            }
     }
 
     LaunchedEffect(Unit) {
@@ -121,7 +129,7 @@ fun HomeScreen(
                 doc.toObject(Patient::class.java)?.copy(id = doc.id)
             }.filter { it.activo }
             patients = loaded
-            expandedIds = loaded.map { it.id }.toSet() // all panels open on load
+            expandedIds = emptySet()
         }
     }
 
@@ -391,15 +399,7 @@ fun HomeScreen(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Image(
-                                painter = painterResource(R.drawable.logosentycare),
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp).clip(CircleShape)
-                            )
-                            Spacer(Modifier.width(5.dp))
-                            Text("SentyCare", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
+                        Text("SentyCare", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         Text(
                             text = SesionState.usuario.nombreCompleto.ifBlank { "Usuario" },
                             color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold
