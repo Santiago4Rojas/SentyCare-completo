@@ -35,8 +35,8 @@ class ReminderReceiver : BroadcastReceiver() {
         val contentPendingIntent = PendingIntent.getActivity(context, 0, openIntent, pendingFlags)
 
         val titulo = if (paciente.isNotBlank()) "Recordatorio — $paciente" else "Recordatorio UCI"
-        val iconSizePx = context.resources.getDimensionPixelSize(android.R.dimen.notification_large_icon_width)
         val rawBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.logosentycare)
+        val iconSizePx = (context.resources.getDimensionPixelSize(android.R.dimen.notification_large_icon_width) * 0.7f).toInt()
         val largeIcon = Bitmap.createScaledBitmap(rawBitmap, iconSizePx, iconSizePx, true)
         rawBitmap.recycle()
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
