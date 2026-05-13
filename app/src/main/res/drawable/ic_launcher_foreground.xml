@@ -2,8 +2,8 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:drawable="@drawable/logosentycare"
-        android:top="12dp"
-        android:bottom="12dp"
-        android:left="11dp"
-        android:right="10.7dp"/>
+        android:top="14dp"
+        android:bottom="14dp"
+        android:left="14dp"
+        android:right="14dp"/>
 </layer-list>
