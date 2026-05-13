@@ -7,6 +7,8 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -86,7 +88,7 @@ fun HomeScreen(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
 
     var patients by remember { mutableStateOf<List<Patient>>(emptyList()) }
-    var expandedPatientId by remember { mutableStateOf<String?>(null) }
+    var expandedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var patientToEditCama by remember { mutableStateOf<Patient?>(null) }
     var newCamaValue by remember { mutableStateOf("") }
     var sortBy by remember { mutableStateOf(SortBy.FECHA) }
@@ -115,9 +117,11 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         db.collection("pacientes").get().addOnSuccessListener { result ->
-            patients = result.documents.mapNotNull { doc ->
+            val loaded = result.documents.mapNotNull { doc ->
                 doc.toObject(Patient::class.java)?.copy(id = doc.id)
             }.filter { it.activo }
+            patients = loaded
+            expandedIds = loaded.map { it.id }.toSet() // all panels open on load
         }
     }
 
@@ -303,13 +307,11 @@ fun HomeScreen(
                                 color = DarkBlue.copy(alpha = 0.7f),
                                 fontSize = 12.sp
                             )
-                            if (SesionState.usuario.especialidad.isNotBlank()) {
-                                Text(
-                                    SesionState.usuario.especialidad,
+                            Text(
+                                    SesionState.usuario.especialidad.ifBlank { "No aplica" },
                                     color = Color.Gray,
                                     fontSize = 11.sp
                                 )
-                            }
                         }
                     }
                 }
@@ -329,6 +331,7 @@ fun HomeScreen(
                         letterSpacing = 0.5.sp
                     )
                     DrawerInfoRow("Apellido", SesionState.usuario.apellido.ifBlank { "—" })
+                    DrawerInfoRow("Especialidad", SesionState.usuario.especialidad.ifBlank { "No aplica" })
                     DrawerInfoRow("Documento", SesionState.usuario.noDoc.ifBlank { "—" })
                     DrawerInfoRow("RH", SesionState.usuario.rh.ifBlank { "—" })
                 }
@@ -388,14 +391,23 @@ fun HomeScreen(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Bienvenido", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Image(
+                                painter = painterResource(R.drawable.logosentycare),
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp).clip(CircleShape)
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text("SentyCare", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
                         Text(
                             text = SesionState.usuario.nombreCompleto.ifBlank { "Usuario" },
                             color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold
                         )
                         val subtitulo = buildString {
                             append(SesionState.usuario.rol.displayName)
-                            if (SesionState.usuario.especialidad.isNotBlank()) append(" · ${SesionState.usuario.especialidad}")
+                            append(" · ")
+                            append(SesionState.usuario.especialidad.ifBlank { "No aplica" })
                         }
                         Text(subtitulo, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
                     }
@@ -461,11 +473,13 @@ fun HomeScreen(
                         contentPadding = PaddingValues(top = 16.dp, bottom = 88.dp)
                     ) {
                         items(sortedPatients, key = { it.id }) { patient ->
-                            val isExpanded = expandedPatientId == patient.id
+                            val isExpanded = patient.id in expandedIds
                             ExpandablePatientCard(
                                 patient = patient,
                                 isExpanded = isExpanded,
-                                onCardClick = { expandedPatientId = if (isExpanded) null else patient.id },
+                                onCardClick = {
+                                    expandedIds = if (isExpanded) expandedIds - patient.id else expandedIds + patient.id
+                                },
                                 onGoToPatient = { onPatientClick(patient) },
                                 onEditCama = { newCamaValue = patient.numeroCama; patientToEditCama = patient },
                                 onDischarge = {
@@ -473,7 +487,7 @@ fun HomeScreen(
                                         .update(mapOf("activo" to false, "numeroCama" to "", "diagnostico" to ""))
                                         .addOnSuccessListener {
                                             patients = patients.filter { it.id != patient.id }
-                                            if (expandedPatientId == patient.id) expandedPatientId = null
+                                            expandedIds = expandedIds - patient.id
                                         }
                                 }
                             )
