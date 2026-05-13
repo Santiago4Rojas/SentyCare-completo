@@ -1,5 +1,6 @@
 package com.example.sentycare
 
+import android.graphics.BitmapFactory
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -33,8 +34,10 @@ class ReminderReceiver : BroadcastReceiver() {
         val contentPendingIntent = PendingIntent.getActivity(context, 0, openIntent, pendingFlags)
 
         val titulo = if (paciente.isNotBlank()) "Recordatorio — $paciente" else "Recordatorio UCI"
+        val largeIcon = BitmapFactory.decodeResource(context.resources, R.drawable.logosentycare)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(largeIcon)
             .setContentTitle(titulo)
             .setContentText(mensaje)
             .setStyle(NotificationCompat.BigTextStyle().bigText(mensaje))
