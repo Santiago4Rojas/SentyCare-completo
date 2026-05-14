@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 
 object ReminderHelper {
 
@@ -26,10 +25,8 @@ object ReminderHelper {
         )
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val triggerAt = System.currentTimeMillis() + delayMs
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
-            am.set(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-        } else {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-        }
+        // setAlarmClock: máxima prioridad del sistema, no requiere permiso especial,
+        // se ejecuta aunque la app esté cerrada o el dispositivo en modo Doze.
+        am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, pi), pi)
     }
 }
