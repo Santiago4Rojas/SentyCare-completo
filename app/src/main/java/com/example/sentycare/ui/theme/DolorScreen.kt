@@ -175,8 +175,7 @@ fun DolorScreen(
                             docRef.update("recomendacionIA", iaTexto, "recomendacionIAGeneradaEn", System.currentTimeMillis())
                         }
                     } catch (e: Exception) {
-                        android.util.Log.e("DolorScreen", "Error IA: ${e.message}", e)
-                        Toast.makeText(context, "IA no disponible: ${e.message?.take(60)}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Evaluación Dolor disponible en historial", Toast.LENGTH_LONG).show()
                     } finally {
                         iaCargando = false
                     }
@@ -613,7 +612,7 @@ fun DolorResultStep(
             }
         }
 
-        // Recomendación IA
+        /*/ Recomendación IA
         Spacer(modifier = Modifier.height(16.dp))
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F0FF)), elevation = CardDefaults.cardElevation(2.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -635,7 +634,7 @@ fun DolorResultStep(
                 }
             }
         }
-
+        */
         Spacer(modifier = Modifier.height(20.dp))
         Text("Referencia de rangos:", fontSize = 13.sp, color = Color.Gray, modifier = Modifier.align(Alignment.Start))
         Spacer(modifier = Modifier.height(10.dp))

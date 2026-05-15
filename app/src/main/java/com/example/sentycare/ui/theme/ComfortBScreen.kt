@@ -168,8 +168,7 @@ fun ComfortBScreen(
                             docRef.update("recomendacionIA", iaTexto, "recomendacionIAGeneradaEn", System.currentTimeMillis())
                         }
                     } catch (e: Exception) {
-                        android.util.Log.e("ComfortBScreen", "Error IA: ${e.message}", e)
-                        Toast.makeText(context, "IA no disponible: ${e.message?.take(60)}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Evaluación ComfortB disponible en historial", Toast.LENGTH_LONG).show()
                     } finally {
                         iaCargando = false
                     }
@@ -483,7 +482,7 @@ fun ResultStep(
             }
         }
 
-        // Recomendación IA
+        /*/ Recomendación IA
         Spacer(modifier = Modifier.height(16.dp))
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F0FF)), elevation = CardDefaults.cardElevation(3.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -510,7 +509,7 @@ fun ResultStep(
                     }
                 }
             }
-        }
+        }*/
 
         Spacer(modifier = Modifier.height(20.dp))
         Text("Referencia de rangos:", fontSize = 13.sp, color = Color.Gray, modifier = Modifier.align(Alignment.Start))
